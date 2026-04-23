@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import random
 from pathlib import Path
@@ -23,7 +24,7 @@ from torch.utils.data import DataLoader
 from transformers import get_cosine_schedule_with_warmup
 
 # ── Project imports ────────────────────────────────────────────────────────
-from config.config import Config
+from config.config import Config, LoRAConfig, GNNConfig, FiLMConfig
 from data.dataset import QADataset
 from data.preprocessing import prepare_all_data
 from evaluation.evaluator import Evaluator
@@ -147,6 +148,54 @@ def build_clients(
 # Baseline: individual training without federation
 # ─────────────────────────────────────────────────────────────────────────────
 
+@torch.no_grad()
+def _preview_generation(
+    client_model: ClientModel,
+    sample: Dict[str, str],
+    cfg: Config,
+    device: torch.device,
+    use_amp: bool,
+    epoch: int,
+) -> None:
+    """Generate one QA from a sample and print context + output."""
+    client_model.model.eval()
+    prompt = (
+        "Generate a question and answer pair from the following machine learning text:"
+        f"\n\n{sample['context']}"
+    )
+    enc = client_model.tokenizer(
+        prompt,
+        max_length=cfg.max_input_len,
+        truncation=True,
+        padding=False,
+        return_tensors="pt",
+    )
+    input_ids = enc["input_ids"].to(device)
+    attention_mask = enc["attention_mask"].to(device)
+
+    with torch.amp.autocast("cuda", enabled=use_amp, dtype=torch.bfloat16):
+        out_ids = client_model.generate(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            num_beams=4,
+            max_new_tokens=cfg.max_target_len,
+            no_repeat_ngram_size=3,
+            early_stopping=True,
+        )
+    generated = client_model.tokenizer.decode(out_ids[0], skip_special_tokens=True)
+
+    ctx_preview = sample["context"][:300].replace("\n", " ")
+    if len(sample["context"]) > 300:
+        ctx_preview += "…"
+
+    print(f"\n  ┌─ Epoch {epoch} generation preview {'─' * 30}")
+    print(f"  │ CONTEXT : {ctx_preview}")
+    print(f"  │ GENERATED: {generated}")
+    print(f"  └{'─' * 50}")
+
+    client_model.model.train()
+
+
 def run_individual_baseline(
     cfg: Config,
     client_splits: Dict[int, Dict[str, List[Dict[str, str]]]],
@@ -229,6 +278,13 @@ def run_individual_baseline(
                 losses.append(loss.item())
             avg = sum(losses) / max(len(losses), 1)
             print(f"  Epoch {epoch + 1}/{total_epochs} — avg_loss={avg:.4f}")
+
+            if (epoch + 1) % 5 == 0:
+                _preview_generation(
+                    client_model,
+                    client_splits[cid]["train"][0],
+                    cfg, device, use_amp, epoch + 1,
+                )
 
         # Evaluate on global test set
         preds, refs = _generate_on_samples(
@@ -434,6 +490,46 @@ def _average_global_metrics(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CLI argument parser
+# ─────────────────────────────────────────────────────────────────────────────
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Federated QA Generation with GNN")
+
+    # Top-level training params
+    p.add_argument("--seed",           type=int,   default=42)
+    p.add_argument("--num-rounds",     type=int,   default=20)
+    p.add_argument("--local-epochs",   type=int,   default=3)
+    p.add_argument("--batch-size",     type=int,   default=4)
+    p.add_argument("--max-input-len",  type=int,   default=512)
+    p.add_argument("--max-target-len", type=int,   default=128)
+    p.add_argument("--lr-lora",        type=float, default=3e-4)
+    p.add_argument("--lr-gnn",         type=float, default=1e-3)
+    p.add_argument("--lr-film",        type=float, default=1e-3)
+    p.add_argument("--warmup-ratio",   type=float, default=0.1)
+    p.add_argument("--grad-clip",      type=float, default=1.0)
+    p.add_argument("--eval-every-n",   type=int,   default=5)
+    p.add_argument("--device",         type=str,   default="cuda")
+    p.add_argument("--output-dir",     type=str,   default="outputs/")
+
+    # LoRA
+    p.add_argument("--lora-r",       type=int,   default=16)
+    p.add_argument("--lora-alpha",   type=int,   default=32)
+    p.add_argument("--lora-dropout", type=float, default=0.1)
+
+    # GNN
+    p.add_argument("--gnn-hidden",  type=int,   default=64)
+    p.add_argument("--gnn-heads",   type=int,   default=4)
+    p.add_argument("--gnn-layers",  type=int,   default=3)
+    p.add_argument("--gnn-dropout", type=float, default=0.1)
+
+    # FiLM
+    p.add_argument("--film-hidden", type=int, default=128)
+
+    return p.parse_args()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -443,7 +539,26 @@ def main() -> None:
     print("  Run the install block at the top of main.py before starting.")
     print("=" * 60 + "\n")
 
-    cfg = Config()
+    args = parse_args()
+    cfg = Config(
+        seed=args.seed,
+        num_rounds=args.num_rounds,
+        local_epochs=args.local_epochs,
+        batch_size=args.batch_size,
+        max_input_len=args.max_input_len,
+        max_target_len=args.max_target_len,
+        lr_lora=args.lr_lora,
+        lr_gnn=args.lr_gnn,
+        lr_film=args.lr_film,
+        warmup_ratio=args.warmup_ratio,
+        grad_clip=args.grad_clip,
+        eval_every_n=args.eval_every_n,
+        device=args.device,
+        output_dir=args.output_dir,
+        lora=LoRAConfig(r=args.lora_r, lora_alpha=args.lora_alpha, lora_dropout=args.lora_dropout),
+        gnn=GNNConfig(hidden=args.gnn_hidden, heads=args.gnn_heads, layers=args.gnn_layers, dropout=args.gnn_dropout),
+        film=FiLMConfig(hidden=args.film_hidden),
+    )
     set_seeds(cfg.seed)
     device = get_device(cfg.device)
     Path(cfg.output_dir).mkdir(parents=True, exist_ok=True)
