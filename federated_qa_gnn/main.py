@@ -13,9 +13,12 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import random
 from pathlib import Path
 from typing import Any, Dict, List
+
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 import numpy as np
 import torch
