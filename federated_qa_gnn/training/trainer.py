@@ -161,18 +161,18 @@ class LocalTrainer:
                     all_train_losses.append(batch_loss)
                     global_step += 1
 
-                    current_lr = scheduler.get_last_lr()[0]
-                    logger.info(
+                    logger.debug(
                         f"round={round_idx} epoch={epoch} step={global_step} "
-                        f"client={client.client_id} loss={batch_loss:.4f} lr={current_lr:.2e}"
+                        f"client={client.client_id} loss={batch_loss:.4f} "
+                        f"lr={scheduler.get_last_lr()[0]:.2e}"
                     )
 
                 avg_epoch_loss = sum(epoch_losses) / max(len(epoch_losses), 1)
                 val_loss = self._compute_val_loss(client, val_loader, use_amp, device)
 
-                logger.info(
-                    f"round={round_idx} epoch={epoch} client={client.client_id} "
-                    f"avg_train_loss={avg_epoch_loss:.4f} val_loss={val_loss:.4f}"
+                print(
+                    f"    epoch {epoch + 1}/{cfg.local_epochs} — "
+                    f"train={avg_epoch_loss:.4f}  val={val_loss:.4f}"
                 )
 
         finally:
