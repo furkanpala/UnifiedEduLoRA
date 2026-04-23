@@ -178,7 +178,7 @@ class FiLMAdapter(nn.Module):
                 z = self._graph_embedding[0]  # [64], fallback
 
             # Run FiLM MLP in FP32 (disable autocast to prevent FP16 coercion)
-            with torch.cuda.amp.autocast(enabled=False):
+            with torch.amp.autocast("cuda", enabled=False):
                 z_f = z.float()
                 film_out = self.mlp(z_f)  # [2 * d_model], FP32
                 gamma, beta = film_out.chunk(2, dim=-1)  # [d_model] each

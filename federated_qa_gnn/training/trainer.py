@@ -91,7 +91,7 @@ class LocalTrainer:
             optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
         )
 
-        scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+        scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
         # Step 1 — refresh effective weight stats before training starts
         refresh_graph_features(
@@ -134,7 +134,7 @@ class LocalTrainer:
                     )
 
                     # Step 4 — LM forward under autocast (FiLM hooks fire here)
-                    with torch.cuda.amp.autocast(enabled=use_amp):
+                    with torch.amp.autocast("cuda", enabled=use_amp):
                         outputs = client.client_model.forward(
                             input_ids=input_ids,
                             attention_mask=attention_mask,
@@ -195,7 +195,7 @@ class LocalTrainer:
             attention_mask = batch["attention_mask"].to(device)
             labels = batch["labels"].to(device)
 
-            with torch.cuda.amp.autocast(enabled=use_amp):
+            with torch.amp.autocast("cuda", enabled=use_amp):
                 outputs = client.client_model.forward(
                     input_ids=input_ids,
                     attention_mask=attention_mask,

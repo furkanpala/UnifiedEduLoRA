@@ -44,14 +44,16 @@ class ClientModel(nn.Module):
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # Base model in FP16 with frozen parameters
-        base_model = AutoModelForSeq2SeqLM.from_pretrained(
-            model_name, torch_dtype=torch.float16
-        )
+        # Base model in FP32 with frozen parameters.
+        # Loading in FP16 causes T5 attention scores to overflow (inf - inf = NaN)
+        # before padding masks are applied. The standard PyTorch mixed-precision
+        # pattern keeps parameters in FP32 and lets autocast cast activations to
+        # FP16 only during the forward pass.
+        base_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
         for param in base_model.parameters():
             param.requires_grad = False
 
-        # Apply LoRA
+        # Apply LoRA — adapters are FP32 by default, compatible with GradScaler
         lora_cfg = LoraConfig(
             task_type=TaskType.SEQ_2_SEQ_LM,
             r=lora_r,
@@ -61,13 +63,6 @@ class ClientModel(nn.Module):
             target_modules=lora_target_modules,
         )
         self.model = get_peft_model(base_model, lora_cfg)
-
-        # LoRA adapters inherit FP16 from the base model. GradScaler requires
-        # optimizer parameters to be FP32, so cast only the trainable weights.
-        for param in self.model.parameters():
-            if param.requires_grad:
-                param.data = param.data.float()
-
         self.model.to(device)
 
         # Detect LED

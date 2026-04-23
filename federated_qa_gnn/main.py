@@ -204,7 +204,7 @@ def run_individual_baseline(
         scheduler = get_cosine_schedule_with_warmup(
             optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
         )
-        scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+        scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
         client_model.model.train()
         for epoch in range(total_epochs):
@@ -214,7 +214,7 @@ def run_individual_baseline(
                 attention_mask = batch["attention_mask"].to(device)
                 labels = batch["labels"].to(device)
                 optimizer.zero_grad()
-                with torch.cuda.amp.autocast(enabled=use_amp):
+                with torch.amp.autocast("cuda", enabled=use_amp):
                     outputs = client_model.forward(input_ids, attention_mask, labels)
                     loss = outputs.loss
                 scaler.scale(loss).backward()
