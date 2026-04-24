@@ -48,7 +48,7 @@ USAGE EXAMPLE:
           model   = "gpt-4o",   # or "gpt-4o-mini" for cheaper drafts
       )
       if result is None:
-          print(f"[WARNING] chunk {i} failed — skipping")
+          print(f"[SKIP] chunk {i} — not suitable or failed (check logs)")
           continue
       entries.append({
           "entry_id":           f"client{CLIENT_ID}_{i:04d}",
@@ -86,6 +86,13 @@ Core principles:
 - Every question must be answerable SOLELY from the provided text.
 - Questions must span a range of Bloom's Taxonomy cognitive levels.
 - Answers must be complete, self-contained explanations — not bare phrases.
+
+IMPORTANT — when to skip:
+If the text contains no substantive educational content — for example it is a \
+table of contents, an index, a list of references, an acknowledgements section, \
+a figure caption list, author affiliations, or any other non-explanatory \
+boilerplate — you must NOT generate QA pairs. Instead respond with:
+{{"skip": true, "reason": "<one sentence explaining why>"}}
 """
 
 _USER = """\
@@ -116,11 +123,13 @@ Cover a VARIETY of levels — do not cluster at 1 or 2.
   - Answerable from the text alone (set answerable_from_context: true; omit pair if not).
   - No questions about "the author" or "the paper" or "the date" etc.
   - Answers must synthesise — do not copy a single sentence verbatim.
+  - If the text has no substantive educational content, respond with {{"skip": true, "reason": "..."}} and nothing else.
 
 TEXT:
 \"\"\"{context}\"\"\"
 
-Respond ONLY with a valid JSON object — no markdown, no commentary:
+Respond ONLY with a valid JSON object — no markdown, no commentary.
+Either the full QA response:
 {{
   "context_topics": ["<topic>", ...],
   "qa_pairs": [
@@ -135,6 +144,8 @@ Respond ONLY with a valid JSON object — no markdown, no commentary:
     }}
   ]
 }}
+Or, if the text is not suitable for QA generation:
+{{"skip": true, "reason": "<one sentence>"}}
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,7 +176,9 @@ def generate_qa_for_context(
                                 bloom_level, bloom_justification,
                                 difficulty, answerable_from_context}, ...]
         }
-        or None if all retries fail.
+        None if the model determines the context has no substantive educational
+        content (table of contents, references, boilerplate, etc.), or if all
+        retries fail due to API/parse errors.
     """
     try:
         from openai import OpenAI
@@ -194,6 +207,10 @@ def generate_qa_for_context(
             parsed = json.loads(raw)
             if not isinstance(parsed, dict):
                 raise ValueError(f"Expected JSON object, got {type(parsed)}")
+
+            if parsed.get("skip"):
+                logger.info(f"Skipped by model: {parsed.get('reason', 'no reason given')}")
+                return None
 
             topics = [t.strip() for t in parsed.get("context_topics", []) if str(t).strip()]
             pairs  = [
