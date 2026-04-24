@@ -19,7 +19,7 @@ OUTPUT FORMAT  (one JSON file per institution, a flat array of entries):
     "qa_pairs": [
       {
         "question":              "<question text>",
-        "answer":                "<answer text, min 20 words>",
+        "answer":                "<answer text>",
         "question_topic":        "<specific ML concept this question tests>",
         "bloom_level":           <int 1-6>,
         "bloom_justification":   "<one sentence>",
@@ -216,7 +216,6 @@ def generate_qa_for_context(
             pairs  = [
                 qa for qa in parsed.get("qa_pairs", [])
                 if qa.get("answerable_from_context", True)
-                and len(qa.get("answer", "").split()) >= 10
                 and qa.get("question", "").strip()
             ]
             return {"context_topics": topics, "qa_pairs": pairs}

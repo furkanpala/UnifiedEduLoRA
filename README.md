@@ -102,7 +102,6 @@ The validator checks:
 - `bloom_level` is an integer between 1 and 6
 - `difficulty` is one of `easy`, `medium`, `hard`
 - `answerable_from_context` is `true` for every pair
-- Every answer has at least 10 words
 
 It also prints a summary of entry counts, total QA pairs, Bloom level distribution, and difficulty distribution.
 

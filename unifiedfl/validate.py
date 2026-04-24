@@ -33,8 +33,6 @@ QA_REQUIRED_KEYS    = {"question", "answer", "question_topic", "bloom_level", "d
 VALID_DIFFICULTIES  = {"easy", "medium", "hard"}
 MIN_CONTEXT_WORDS   = 50     # lenient lower bound (spec says 150, but allow shorter)
 MAX_CONTEXT_WORDS   = 600    # lenient upper bound (spec says 400)
-MIN_ANSWER_WORDS    = 10
-
 
 def _check_entry(i: int, entry: Any) -> List[str]:
     errors: List[str] = []
@@ -102,10 +100,8 @@ def _check_qa(entry_loc: str, j: int, qa: Any) -> List[str]:
         errors.append(f"{loc}: question must be a non-empty string")
 
     ans = qa.get("answer", "")
-    if not isinstance(ans, str):
-        errors.append(f"{loc}: answer must be a string")
-    elif len(ans.split()) < MIN_ANSWER_WORDS:
-        errors.append(f"{loc}: answer too short ({len(ans.split())} words, minimum {MIN_ANSWER_WORDS})")
+    if not isinstance(ans, str) or not ans.strip():
+        errors.append(f"{loc}: answer must be a non-empty string")
 
     qt = qa.get("question_topic", "")
     if not isinstance(qt, str) or not qt.strip():
