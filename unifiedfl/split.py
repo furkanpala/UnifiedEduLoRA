@@ -1,14 +1,12 @@
 """
 Create and persist train/val/test splits with 3-fold cross-validation.
 
-PROTOCOL — every collaborator runs this with the same seed (default 42).
-The seed is non-negotiable: it is the anchor that makes all three experiments
-(individual, FedKD, UnifiedEdu) directly comparable.
+PROTOCOL - every collaborator runs this with the same seed (default 42).
 
 Split structure
 ───────────────
-  Step 1  Fix a test set (15% of entries) — identical across all folds.
-          NEVER used for training or validation. Touched only at final evaluation.
+  Step 1  Fix a test set (15% of entries) - identical across all folds.
+          never used for training or validation
 
   Step 2  Divide the remaining 85% into 3 equal folds.
 
@@ -27,20 +25,14 @@ Output (inside --output-dir/splits/)
   client_<N>_fold2_val.json
   client_<N>_fold3_train.json
   client_<N>_fold3_val.json
-  checksums.txt                   ← MD5 of every file; send this to the coordinator
+  checksums.txt                   ← MD5 of every file; send this to Furkan Pala
 
 Usage
 ─────
   python split.py \\
       --client 0:data/client0_data.json \\
       --seed   42                        # DO NOT CHANGE
-      --output-dir outputs/
-
-  # Colab + Drive:
-  python split.py \\
-      --client 0:data/client0_data.json \\
-      --seed   42 \\
-      --output-dir /content/drive/MyDrive/equitableedu/outputs
+      --output-dir outputs
 """
 
 from __future__ import annotations
@@ -262,7 +254,7 @@ def main() -> None:
     print(f"\n{'=' * 60}")
     print(f"All splits saved to: {splits_dir}")
     print(f"Checksums:           {checksum_path}")
-    print(f"\n>>> Send checksums.txt to the coordinator for verification. <<<\n")
+    print(f"\n>>> Send checksums.txt to Furkan Pala for verification. <<<\n")
 
 
 if __name__ == "__main__":

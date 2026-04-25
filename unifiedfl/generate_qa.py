@@ -1,11 +1,11 @@
 """
-QA Generation API — call this once per context chunk after your own preprocessing.
+QA Generation API - call this once per context chunk after your own preprocessing.
 
 YOUR RESPONSIBILITY (before calling this):
   1. Convert your raw source (PDF, PPTX, Word, images, etc.) to plain text.
   2. Split the text into context chunks:
        - 150-400 words per chunk.
-       - Plain prose only — no bullet points, LaTeX, figure captions, headers.
+       - Plain prose only - no bullet points, LaTeX, figure captions, headers.
   3. Call generate_qa_for_context() for each chunk.
   4. Collect results into a JSON array and save as described in OUTPUT FORMAT below.
 
@@ -48,7 +48,7 @@ USAGE EXAMPLE:
           model   = "gpt-4o",   # or "gpt-4o-mini" for cheaper drafts
       )
       if result is None:
-          print(f"[SKIP] chunk {i} — not suitable or failed (check logs)")
+          print(f"[SKIP] chunk {i} - not suitable or failed (check logs)")
           continue
       entries.append({
           "entry_id":           f"client{CLIENT_ID}_{i:04d}",
@@ -85,22 +85,22 @@ from ML educational text.
 Core principles:
 - Every question must be answerable SOLELY from the provided text.
 - Questions must span a range of Bloom's Taxonomy cognitive levels.
-- Answers must be complete, self-contained explanations — not bare phrases.
+- Answers must be complete, self-contained explanations - not bare phrases.
 
-IMPORTANT — when to skip:
-If the text contains no substantive educational content — for example it is a \
+IMPORTANT - when to skip:
+If the text contains no substantive educational content - for example it is a \
 table of contents, an index, a list of references, an acknowledgements section, \
 a figure caption list, author affiliations, or any other non-explanatory \
-boilerplate — you must NOT generate QA pairs. Instead respond with:
+boilerplate - you must NOT generate QA pairs. Instead respond with:
 {{"skip": true, "reason": "<one sentence explaining why>"}}
 """
 
 _USER = """\
 Analyse the following machine learning text and produce:
-  1. context_topics — 2 to 6 concise ML/AI concept labels (2-4 words each).
-  2. qa_pairs — exactly {n_pairs} question-answer pairs.
+  1. context_topics - 2 to 6 concise ML/AI concept labels (2-4 words each).
+  2. qa_pairs - exactly {n_pairs} question-answer pairs.
 
-━━━ TOPIC GUIDELINES ━━━
+--- TOPIC GUIDELINES ---
 context_topics:
   Focus on technical ML concepts, ordered from most to least central.
   GOOD: "Gradient Descent", "Learning Rate Sensitivity", "Mini-batch SGD"
@@ -110,25 +110,25 @@ question_topic:
   One label (2-4 words) for the specific ML concept the question tests.
   Match or sub-topic of a context_topic. Be specific: "Vanishing Gradient" not "Backpropagation".
 
-━━━ BLOOM'S TAXONOMY ━━━
-  1 Remember  — define, list, name, state
-  2 Understand — describe, summarise, explain
-  3 Apply      — solve, demonstrate, compute
-  4 Analyse    — compare, contrast, distinguish
-  5 Evaluate   — critique, assess, justify
-  6 Create     — design, propose, formulate
-Cover a VARIETY of levels — do not cluster at 1 or 2.
+--- BLOOM'S TAXONOMY ---
+  1 Remember  - define, list, name, state
+  2 Understand - describe, summarise, explain
+  3 Apply      - solve, demonstrate, compute
+  4 Analyse    - compare, contrast, distinguish
+  5 Evaluate   - critique, assess, justify
+  6 Create     - design, propose, formulate
+Cover a VARIETY of levels - do not cluster at 1 or 2.
 
-━━━ HARD RULES ━━━
+--- HARD RULES ---
   - Answerable from the text alone (set answerable_from_context: true; omit pair if not).
   - No questions about "the author" or "the paper" or "the date" etc.
-  - Answers must synthesise — do not copy a single sentence verbatim.
+  - Answers must synthesise - do not copy a single sentence verbatim.
   - If the text has no substantive educational content, respond with {{"skip": true, "reason": "..."}} and nothing else.
 
 TEXT:
 \"\"\"{context}\"\"\"
 
-Respond ONLY with a valid JSON object — no markdown, no commentary.
+Respond ONLY with a valid JSON object - no markdown, no commentary.
 Either the full QA response:
 {{
   "context_topics": ["<topic>", ...],
@@ -166,7 +166,7 @@ def generate_qa_for_context(
         context:     Plain-text passage, 150-400 words, one coherent ML topic.
         api_key:     Your OpenAI API key.
         n_pairs:     Number of QA pairs to generate (default 5).
-        model:       OpenAI model — "gpt-4o" (best) or "gpt-4o-mini" (cheaper).
+        model:       OpenAI model - "gpt-4o" (suggested).
         max_retries: Number of retry attempts on parse or API failure.
 
     Returns:
@@ -221,9 +221,9 @@ def generate_qa_for_context(
             return {"context_topics": topics, "qa_pairs": pairs}
 
         except (json.JSONDecodeError, ValueError) as e:
-            logger.warning(f"Attempt {attempt}: parse error — {e}")
+            logger.warning(f"Attempt {attempt}: parse error - {e}")
         except Exception as e:
-            logger.warning(f"Attempt {attempt}: API error — {e}")
+            logger.warning(f"Attempt {attempt}: API error - {e}")
 
         if attempt < max_retries:
             time.sleep(delay)

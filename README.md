@@ -12,13 +12,66 @@ Each collaborating institution follows these steps independently before the firs
 
 ### Step 1 — Convert Your Source Material to Plain-Text Chunks
 
-Convert your raw educational content (PDFs, lecture slides, papers, etc.) into plain-text **context chunks**:
+Convert your raw educational content into plain-text **context chunks**:
 
 - **150–400 words per chunk** — one coherent topic per chunk
-- **Plain prose only** — remove bullet points, LaTeX math, figure captions, headers, and footers
-- Each chunk should stand alone: a reader with no context should be able to answer questions from it
+- **Plain prose only** — no bullet points, LaTeX math, figure captions, headers, or footers
+- Each chunk should stand alone: a reader with no surrounding context should be able to answer questions from it
 
-You are responsible for this step using whatever tools suit your source format (e.g. PyMuPDF for PDFs, python-pptx for slides).
+Two converter scripts are provided in `unifiedfl/data/` as starting points. **They will likely need small adjustments for your specific files** — every PDF and slide deck is formatted differently. Read the comments at the top of each script before running.
+
+#### PDF → chunks (`data/pdf_to_chunks.py`)
+
+```bash
+pip install pymupdf
+
+# Inspect first, then run:
+python data/pdf_to_chunks.py lecture.pdf
+
+# Skip cover page, references, and appendix (0-based page indices):
+python data/pdf_to_chunks.py lecture.pdf --skip-pages 0 1 42 43 44
+
+# Output: lecture_chunks.json  — a JSON array of plain-text strings
+```
+
+Key things to adjust inside the script:
+- `SKIP_PAGES` — pages to exclude (cover, table of contents, references, appendix)
+- `SKIP_IF_FEWER` — raise this if very sparse pages are slipping through
+- `TARGET_WORDS` — default is 250; increase for dense academic text
+- `_strip_boilerplate()` — removes the first/last line of each page (running headers/footers); disable if your PDF does not have these
+
+#### PowerPoint → chunks (`data/pptx_to_chunks.py`)
+
+```bash
+pip install python-pptx
+
+# First, see which slide layouts exist in your file:
+python data/pptx_to_chunks.py lecture.pptx --list-layouts
+
+# Then run (title slides and section headers are skipped by default):
+python data/pptx_to_chunks.py lecture.pptx
+
+# If your slides have speaker notes with the real explanation, include them:
+python data/pptx_to_chunks.py lecture.pptx --include-notes
+
+# Output: lecture_chunks.json  — a JSON array of plain-text strings
+```
+
+Key things to adjust inside the script:
+- `SKIP_LAYOUTS` — layout names to exclude (use `--list-layouts` to find the right names for your deck)
+- `SKIP_IF_FEWER` — slides with fewer words than this are dropped; lower it if too many slides are being skipped
+- `INCLUDE_NOTES` — set to `True` if speaker notes contain the substantive explanation rather than the slide body
+- `INCLUDE_TITLES` — set to `False` if slide titles are just labels that add no educational content
+
+#### Using the output
+
+Both scripts produce a JSON array of chunk strings. Pass these directly into `generate_qa.py`:
+
+```python
+import json
+my_chunks = json.load(open("lecture_chunks.json"))
+# then proceed with the generate_qa_for_context() loop in Step 2
+```
 
 ---
 
