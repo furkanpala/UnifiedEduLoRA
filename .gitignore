@@ -12,6 +12,7 @@ __pycache__/
 venv/
 dist/
 build/
+run_example.py
 
 # Outputs & checkpoints
 outputs/
@@ -20,6 +21,7 @@ fed_checkpoints/
 **/fed_checkpoints/
 *.pt
 *.ckpt
+example_output/
 
 # Jupyter
 .ipynb_checkpoints/

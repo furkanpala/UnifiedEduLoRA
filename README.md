@@ -4,7 +4,7 @@ A graph-based federated learning framework for equitable QA generation across he
 
 ---
 
-## Data Preparation — Step-by-Step
+## Phase 1 - Data Preparation 
 
 Each collaborating institution follows these steps independently before the first training meeting. The goal is to produce a single validated JSON file and a set of reproducible splits.
 
@@ -234,6 +234,148 @@ Send `outputs/splits/checksums.txt` to the project coordinator. This file contai
 e9ed4f86717a9e56d0b4866dd13800d9  client_0_fold1_train.json
 ...
 ```
+
+---
+
+---
+
+## Phase 2 — Individual Training Baseline (Experiment 1)
+
+Each institution trains a local LoRA adapter on their own data. No data leaves the institution. This produces the individual baseline against which the federated model is compared.
+
+---
+
+### Environment Setup (Google Colab)
+
+```python
+# 1. Mount your Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+# 2. Clone the repo (or upload it to Drive and add the path)
+!git clone https://github.com/basiralab/EquitableEdu /content/EquitableEdu
+%cd /content/EquitableEdu
+
+# 3. Install dependencies
+!pip install -q transformers peft torch torch-geometric \
+    rouge_score bert_score nltk accelerate sentencepiece \
+    "numpy<2" openai
+```
+
+Upload your `client<N>_fold*.json` split files (produced in Phase 1) to Drive, e.g. to:
+```
+/content/drive/MyDrive/unifiedfl/outputs/splits/
+```
+
+---
+
+### Training Command
+
+Run one fold at a time. Repeat for folds 1, 2, and 3.
+
+```bash
+python unifiedfl/train_client.py \
+    --client-id   <your_client_id_you_used_in_phase1> \
+    --fold        1 \
+    --model       <your_assigned_model> \
+    --family      <your_assigned_model_family> \
+    --targets     <your_assigned_model_targets> \
+    --splits-dir  /content/drive/MyDrive/unifiedfl/outputs/splits \
+    --output-dir  /content/drive/MyDrive/unifiedfl/outputs \
+    --num-epochs  60 \
+    --batch-size  4 \
+    --lr          3e-4 \
+    --patience    10 \
+    --openai-api-key  sk-... (your api key provided by email)
+```
+
+#### Key hyperparameters
+
+| Argument | Default | What it controls |
+|---|---|---|
+| `--fold` | required | Which CV fold to train on (1, 2, or 3) |
+| `--num-epochs` | 60 | Maximum training epochs |
+| `--batch-size` | 4 | Samples per gradient step |
+| `--lr` | 3e-4 | Peak learning rate (cosine decay with warmup) |
+| `--warmup-ratio` | 0.1 | Fraction of total steps used for LR warm-up |
+| `--grad-clip` | 1.0 | Gradient clipping norm |
+| `--patience` | 10 | Early stopping — halt if val loss does not improve for this many epochs |
+| `--min-delta` | 1e-4 | Minimum improvement in val loss to reset the patience counter |
+| `--lora-r` | 16 | LoRA rank |
+| `--lora-alpha` | 32 | LoRA scaling factor |
+| `--lora-dropout` | 0.1 | LoRA dropout |
+| `--preview-every` | 5 | Print a generated QA from the val set every N epochs (0 = off) |
+| `--checkpoint-every` | 10 | Save a checkpoint every N epochs |
+| `--no-heavy` | off | Skip heavy metrics (UnifiedQA + DeBERTa) in final evaluation |
+| `--openai-api-key` | none | Enable Answer Relevancy and Bloom's LLM judge metrics |
+| `--blooms-model` | `cip29/bert-blooms-taxonomy-classifier` | HuggingFace model ID for the local Bloom's classifier (set to `''` to skip) |
+
+#### Model choices by architecture
+
+| Model | `--model` | `--family` | `--targets` |
+|---|---|---|---|
+| Flan-T5-small | `google/flan-t5-small` | `t5` | `q v` |
+| Flan-T5-base | `google/flan-t5-base` | `t5` | `q v` |
+| BART-base | `facebook/bart-base` | `bart` | `q_proj v_proj` |
+| LED-base | `allenai/led-base-16384` | `led` | `q_proj v_proj` |
+
+---
+
+### Running All Three Folds
+
+Run the command above three times, changing `--fold 1`, `--fold 2`, `--fold 3`. Each fold writes its outputs to a separate directory.
+
+```
+outputs/
+└── client_0/
+    ├── fold1/
+    │   ├── best/lora_model/          ← best LoRA weights (by val loss)
+    │   ├── final/lora_model/         ← weights at last epoch
+    │   ├── checkpoints/              ← periodic checkpoints for resuming
+    │   ├── loss_history.json         ← train and val loss per epoch
+    │   ├── metrics_val.json          ← all evaluation metrics on the val set
+    │   └── generated_qas_val.json    ← model-generated QA pairs vs. references
+    ├── fold2/
+    └── fold3/
+```
+
+`metrics_val.json` contains:
+
+| Metric | Description |
+|---|---|
+| `rouge_l` | ROUGE-L F1 |
+| `bleu_4` | BLEU-4 |
+| `bertscore_f1` | BERTScore F1 (DeBERTa-v3) |
+| `rtc` | Round-Trip Consistency — UnifiedQA re-answers the generated question from context |
+| `faithfulness` | RAGAS Faithfulness — fraction of answer claims entailed by the context |
+| `qafacteval` | QAFactEval (approx.) — UnifiedQA yes/no factual consistency |
+| `rquge` | RQUGE (approx.) — answer quality score in [1, 5] |
+| `answer_relevancy` | RAGAS Answer Relevancy — cosine similarity of original vs. reverse-generated questions |
+| `blooms_cls_distribution` | Bloom level counts from a local fine-tuned BERT classifier |
+| `blooms_cls_evs_mean` | Educational Value Score from classifier — mean normalised Bloom level in [0, 1] |
+| `blooms_llm_distribution` | Bloom level counts from GPT-4o-mini LLM judge (requires `--openai-api-key`) |
+| `blooms_llm_evs_mean` | Educational Value Score from LLM judge in [0, 1] |
+| `llm_judge_context_grounding_mean` | LLM judge — is the question answerable from the context (1–5) |
+| `llm_judge_educational_value_mean` | LLM judge — pedagogical merit of the question (1–5) |
+| `llm_judge_answer_correctness_mean` | LLM judge — answer is factually correct given the context (1–5) |
+| `llm_judge_answer_relevance_mean` | LLM judge — answer actually addresses the question (1–5) |
+| `llm_judge_overall_mean` | LLM judge — mean across the four dimensions, normalised to [0, 1] |
+
+---
+
+### Resuming After a Colab Disconnect
+
+If training is interrupted, resume from the last saved checkpoint:
+
+```bash
+python unifiedfl/train_client.py \
+    --client-id 0 \
+    --fold 1 \
+    ... \
+    --resume-from-epoch 30
+```
+
+The checkpoint at `outputs/client_0/fold1/checkpoints/epoch_30/` will be loaded and training will continue from epoch 31.
 
 ---
 
