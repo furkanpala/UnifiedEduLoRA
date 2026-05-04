@@ -79,7 +79,16 @@ def load_fed(fed_dir: Path) -> dict[str, dict]:
                 pass
         print(f"  [warn] federated metrics not found: {path}")
         return {}
-    return json.loads(path.read_text())
+    raw = json.loads(path.read_text())
+    # New format: { best_round, best_avg_val_loss, per_client_metrics: {...} }
+    # Old format: flat { "0": {...}, "1": {...}, ... }
+    if "per_client_metrics" in raw:
+        if "best_round" in raw:
+            print(f"  [info] federated best snapshot was round "
+                  f"{raw.get('best_round')} "
+                  f"(avg val loss = {raw.get('best_avg_val_loss'):.4f})")
+        return raw["per_client_metrics"]
+    return raw
 
 
 def fmt(v) -> str:

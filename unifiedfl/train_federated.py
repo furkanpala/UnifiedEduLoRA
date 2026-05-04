@@ -189,16 +189,44 @@ def _load_round_checkpoint(
     ckpt_dir = ckpt_base / f"round_{round_idx}"
     if not ckpt_dir.exists():
         raise FileNotFoundError(f"Round checkpoint not found: {ckpt_dir}")
+    _load_state_from_dir(clients, ckpt_dir, device)
+    print(f"  [checkpoint] resumed from round {round_idx} ← {ckpt_dir}")
 
-    gnn_state = torch.load(ckpt_dir / "gnn.pt", map_location=device)
+
+def _save_snapshot(clients: list, snapshot_dir: Path) -> None:
+    """Save a named snapshot of all client states (LoRA + FiLM + shared GNN)."""
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
     for client in clients:
-        cdir = ckpt_dir / f"client_{client.client_id}"
-        client.client_model.model.load_adapter(str(cdir / "lora_model"), adapter_name="default")
+        cdir = snapshot_dir / f"client_{client.client_id}"
+        cdir.mkdir(exist_ok=True)
+        client.client_model.model.save_pretrained(str(cdir / "lora_model"))
+        torch.save(client.film_adapter.state_dict(), cdir / "film.pt")
+    torch.save(clients[0].gnn.state_dict(), snapshot_dir / "gnn.pt")
+
+
+def _load_state_from_dir(
+    clients: list,
+    snapshot_dir: Path,
+    device: torch.device,
+) -> None:
+    """
+    Restore all client states from a snapshot directory.
+
+    Uses set_peft_model_state_dict() to overwrite the existing 'default' LoRA
+    adapter. PEFT's load_adapter() would create a NEW adapter rather than
+    overwrite — that is the latent bug in older code paths.
+    """
+    from peft.utils.save_and_load import load_peft_weights, set_peft_model_state_dict
+
+    gnn_state = torch.load(snapshot_dir / "gnn.pt", map_location=device)
+    for client in clients:
+        cdir = snapshot_dir / f"client_{client.client_id}"
+        lora_state = load_peft_weights(str(cdir / "lora_model"), device=str(device))
+        set_peft_model_state_dict(client.client_model.model, lora_state)
         client.film_adapter.load_state_dict(
             torch.load(cdir / "film.pt", map_location=device)
         )
         client.gnn.load_state_dict(gnn_state)
-    print(f"  [checkpoint] resumed from round {round_idx} ← {ckpt_dir}")
 
 
 # ── build federated clients ───────────────────────────────────────────────────
@@ -352,6 +380,14 @@ def main() -> None:
 
     final_metrics: dict = {}
 
+    # Best-snapshot tracking: save full state when avg val loss across clients
+    # improves. Acts as overfitting protection AND parity with the individual
+    # baseline (which uses early stopping + best-checkpoint selection).
+    best_avg_val_loss = float("inf")
+    best_round = 0
+    best_snapshot_dir = ckpt_base / "best_snapshot"
+    min_delta = 1e-4
+
     print(f"\n{'=' * 60}")
     print("  FEDERATED TRAINING")
     print(f"  {len(clients)} clients × {cfg.num_rounds} rounds × {cfg.local_epochs} local epochs")
@@ -391,28 +427,25 @@ def main() -> None:
             client.load_gnn_state_dict(global_state)
         round_record["gnn_global_norm"] = server.global_param_norm()
 
-        # Evaluation — run on every eval_every_n round AND always on the final round
-        is_final = (round_idx + 1 == cfg.num_rounds)
-        if global_test and ((round_idx + 1) % cfg.eval_every_n == 0 or is_final):
-            print(f"\n  [Evaluation — Round {round_idx + 1}]")
+        # ── Best-snapshot tracking ──────────────────────────────────────────
+        val_losses = [c["val_loss"] for c in round_record["clients"]]
+        avg_val_loss = sum(val_losses) / max(len(val_losses), 1)
+        round_record["avg_val_loss"] = avg_val_loss
+        if avg_val_loss < best_avg_val_loss - min_delta:
+            best_avg_val_loss = avg_val_loss
+            best_round = round_idx + 1
+            _save_snapshot(clients, best_snapshot_dir)
+            print(f"  → new best avg val loss: {avg_val_loss:.4f} "
+                  f"(round {best_round}) — snapshot saved")
+        else:
+            print(f"  avg val loss: {avg_val_loss:.4f} "
+                  f"(best={best_avg_val_loss:.4f} @ round {best_round})")
+
+        # Periodic per-round monitoring eval (NOT used for final metrics)
+        if global_test and (round_idx + 1) % cfg.eval_every_n == 0:
+            print(f"\n  [Monitoring eval — Round {round_idx + 1}]")
             eval_results = evaluator.quantitative_eval(round_idx + 1, global_test)
             round_record["eval_metrics"] = eval_results
-            if is_final:
-                # Average global metrics across clients
-                sums = {"rouge_l": 0.0, "bleu_4": 0.0, "bertscore_f1": 0.0}
-                for cid, splits in eval_results.items():
-                    for k in sums:
-                        sums[k] += splits.get("global", {}).get(k, 0.0)
-                n = max(len(eval_results), 1)
-                final_metrics = {k: v / n for k, v in sums.items()}
-                # Save per-client metrics for comparison script
-                per_client_path = output_dir / "final_metrics_per_client.json"
-                per_client_path.write_text(
-                    json.dumps(
-                        {str(cid): v for cid, v in eval_results.items()}, indent=2
-                    )
-                )
-                print(f"  Per-client metrics saved → {per_client_path}")
 
         json_logger.append_round(round_record)
 
@@ -420,8 +453,21 @@ def main() -> None:
         if args.checkpoint_every_round > 0 and (round_idx + 1) % args.checkpoint_every_round == 0:
             _save_round_checkpoint(clients, round_idx, ckpt_base)
 
-    # Final evaluation if not already run (safety fallback)
-    if global_test and not final_metrics:
+    # ── Restore best snapshot before final evaluation ────────────────────────
+    if best_round > 0 and best_snapshot_dir.exists():
+        print(f"\n{'=' * 60}")
+        print(f"  Restoring best snapshot: round {best_round} "
+              f"(avg val loss = {best_avg_val_loss:.4f})")
+        print(f"{'=' * 60}")
+        _load_state_from_dir(clients, best_snapshot_dir, device)
+    else:
+        print("\nNo best snapshot to restore — using final-round state.")
+
+    # ── Final evaluation on the (possibly restored) best snapshot ────────────
+    if global_test:
+        print(f"\n{'=' * 60}")
+        print("  Final evaluation on best snapshot")
+        print(f"{'=' * 60}")
         eval_results = evaluator.quantitative_eval(cfg.num_rounds, global_test)
         sums = {"rouge_l": 0.0, "bleu_4": 0.0, "bertscore_f1": 0.0}
         for cid, splits in eval_results.items():
@@ -429,10 +475,17 @@ def main() -> None:
                 sums[k] += splits.get("global", {}).get(k, 0.0)
         n = max(len(eval_results), 1)
         final_metrics = {k: v / n for k, v in sums.items()}
+
         per_client_path = output_dir / "final_metrics_per_client.json"
         per_client_path.write_text(
-            json.dumps({str(cid): v for cid, v in eval_results.items()}, indent=2)
+            json.dumps({
+                "best_round":          best_round,
+                "best_avg_val_loss":   best_avg_val_loss,
+                "per_client_metrics":  {str(cid): v for cid, v in eval_results.items()},
+            }, indent=2)
         )
+        print(f"  Per-client metrics saved → {per_client_path}")
+        print(f"  Best-snapshot round: {best_round}")
 
     if final_metrics:
         json_logger.set_federated_final(final_metrics)
