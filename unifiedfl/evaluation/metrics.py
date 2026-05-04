@@ -190,7 +190,9 @@ def _get_nli_pipeline(device: torch.device):
     if "nli" not in _CACHE:
         from transformers import pipeline as hf_pipeline
         logger.info("Loading DeBERTa-v3-small NLI model (one-time download) …")
-        dev_id = device.index if device.type == "cuda" else -1
+        # torch.device("cuda") has .index == None; pass 0 in that case so the
+        # HF pipeline puts the model on GPU instead of silently falling back to CPU.
+        dev_id = (device.index if device.index is not None else 0) if device.type == "cuda" else -1
         pipe = hf_pipeline(
             "text-classification",
             model="cross-encoder/nli-deberta-v3-small",
@@ -422,7 +424,9 @@ def _get_blooms_classifier(device: torch.device, model_name: str):
     if key not in _CACHE:
         from transformers import pipeline as hf_pipeline
         logger.info(f"Loading Bloom's classifier from {model_name} …")
-        dev_id = device.index if device.type == "cuda" else -1
+        # torch.device("cuda") has .index == None; pass 0 in that case so the
+        # HF pipeline puts the model on GPU instead of silently falling back to CPU.
+        dev_id = (device.index if device.index is not None else 0) if device.type == "cuda" else -1
         _CACHE[key] = hf_pipeline(
             "text-classification",
             model=model_name,
