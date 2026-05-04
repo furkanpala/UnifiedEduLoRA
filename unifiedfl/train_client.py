@@ -144,6 +144,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--blooms-model", default="cip29/bert-blooms-taxonomy-classifier",
                    help="HuggingFace model ID for the local Bloom's classifier "
                         "(set to '' to skip)")
+    p.add_argument("--global-test-file", default=None,
+                   help="Path to a JSON file of flat QA samples. If provided, the best "
+                        "checkpoint is also evaluated on this set and results are saved "
+                        "to metrics_global_test.json alongside metrics_val.json.")
 
     return p.parse_args()
 
@@ -654,6 +658,36 @@ def main() -> None:
     with open(qa_path, "w", encoding="utf-8") as f:
         json.dump(qa_records, f, indent=2, ensure_ascii=False)
     print(f"  Generated QAs saved → {qa_path}")
+
+    # ── Optional global test set evaluation ──────────────────────────────────
+    if args.global_test_file:
+        global_test_path = Path(args.global_test_file)
+        if not global_test_path.exists():
+            print(f"\nWARNING: --global-test-file not found: {global_test_path} — skipping.")
+        else:
+            print(f"\nEvaluating on global test set: {global_test_path} …")
+            global_test_samples = json.loads(global_test_path.read_text(encoding="utf-8"))
+            g_preds, g_refs, g_contexts = _evaluate(
+                client_model, global_test_samples, args, device, use_amp
+            )
+            g_quick = compute_all_metrics(g_preds, g_refs, device)
+            print(
+                f"  Global ROUGE-L={g_quick['rouge_l']:.3f}  "
+                f"BLEU-4={g_quick['bleu_4']:.3f}  "
+                f"BERTScore={g_quick['bertscore_f1']:.3f}"
+            )
+            g_metrics = compute_comprehensive_metrics(
+                generated=g_preds,
+                references=g_refs,
+                contexts=g_contexts,
+                device=device,
+                openai_api_key=args.openai_api_key,
+                run_heavy=not args.no_heavy,
+                blooms_model=args.blooms_model or None,
+            )
+            g_metrics_path = client_dir / "metrics_global_test.json"
+            g_metrics_path.write_text(json.dumps(g_metrics, indent=2))
+            print(f"  Global test metrics saved → {g_metrics_path}")
 
     print(f"\nAll outputs saved to {client_dir}")
 

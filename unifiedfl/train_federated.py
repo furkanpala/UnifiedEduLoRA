@@ -89,6 +89,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-target-len", type=int,   default=128)
     p.add_argument("--eval-every-n",   type=int,   default=5)
 
+    # Conditioning
+    p.add_argument("--conditioning", default="baseline",
+                   choices=["baseline", "topic", "bloom"],
+                   help="Prompt-conditioning mode used for training AND evaluation.")
+    p.add_argument("--no-qual-eval", action="store_true",
+                   help="Skip qualitative evaluation (useful for topic/bloom conditioning "
+                        "when hardcoded contexts are less meaningful).")
+
     # LoRA
     p.add_argument("--lora-r",       type=int,   default=16)
     p.add_argument("--lora-alpha",   type=int,   default=32)
@@ -300,6 +308,7 @@ def main() -> None:
                       layers=args.gnn_layers, dropout=args.gnn_dropout),
         film=FiLMConfig(hidden=args.film_hidden, alpha_init=args.film_alpha),
         clients=client_cfgs,
+        conditioning=args.conditioning,
     )
 
     # Load splits from disk
@@ -382,12 +391,13 @@ def main() -> None:
             client.load_gnn_state_dict(global_state)
         round_record["gnn_global_norm"] = server.global_param_norm()
 
-        # Evaluation
-        if global_test and (round_idx + 1) % cfg.eval_every_n == 0:
+        # Evaluation — run on every eval_every_n round AND always on the final round
+        is_final = (round_idx + 1 == cfg.num_rounds)
+        if global_test and ((round_idx + 1) % cfg.eval_every_n == 0 or is_final):
             print(f"\n  [Evaluation — Round {round_idx + 1}]")
             eval_results = evaluator.quantitative_eval(round_idx + 1, global_test)
             round_record["eval_metrics"] = eval_results
-            if round_idx + 1 == cfg.num_rounds:
+            if is_final:
                 # Average global metrics across clients
                 sums = {"rouge_l": 0.0, "bleu_4": 0.0, "bertscore_f1": 0.0}
                 for cid, splits in eval_results.items():
@@ -395,6 +405,14 @@ def main() -> None:
                         sums[k] += splits.get("global", {}).get(k, 0.0)
                 n = max(len(eval_results), 1)
                 final_metrics = {k: v / n for k, v in sums.items()}
+                # Save per-client metrics for comparison script
+                per_client_path = output_dir / "final_metrics_per_client.json"
+                per_client_path.write_text(
+                    json.dumps(
+                        {str(cid): v for cid, v in eval_results.items()}, indent=2
+                    )
+                )
+                print(f"  Per-client metrics saved → {per_client_path}")
 
         json_logger.append_round(round_record)
 
@@ -402,7 +420,7 @@ def main() -> None:
         if args.checkpoint_every_round > 0 and (round_idx + 1) % args.checkpoint_every_round == 0:
             _save_round_checkpoint(clients, round_idx, ckpt_base)
 
-    # Final evaluation if not already run
+    # Final evaluation if not already run (safety fallback)
     if global_test and not final_metrics:
         eval_results = evaluator.quantitative_eval(cfg.num_rounds, global_test)
         sums = {"rouge_l": 0.0, "bleu_4": 0.0, "bertscore_f1": 0.0}
@@ -411,6 +429,10 @@ def main() -> None:
                 sums[k] += splits.get("global", {}).get(k, 0.0)
         n = max(len(eval_results), 1)
         final_metrics = {k: v / n for k, v in sums.items()}
+        per_client_path = output_dir / "final_metrics_per_client.json"
+        per_client_path.write_text(
+            json.dumps({str(cid): v for cid, v in eval_results.items()}, indent=2)
+        )
 
     if final_metrics:
         json_logger.set_federated_final(final_metrics)

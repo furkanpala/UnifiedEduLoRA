@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 import torch
 from torch.utils.data import DataLoader
 
-from data.dataset import QADataset, PROMPT_TEMPLATE, TARGET_TEMPLATE
+from data.dataset import QADataset, render_prompt, TARGET_TEMPLATE
 from evaluation.metrics import compute_all_metrics
 from utils.logging_utils import print_qualitative_result, print_quantitative_table
 
@@ -15,8 +15,10 @@ logger = logging.getLogger("federated_qa")
 # ── Hardcoded qualitative contexts ────────────────────────────────────────────
 # These 9 contexts never appear in any train/val/test split.
 
-QUALITATIVE_CONTEXTS: Dict[int, List[str]] = {
-    # Client 0 — T5 / MIT lecture style
+# Each entry is (context_text, topic_label) so qualitative_eval works for all
+# conditioning modes without a live model to suggest topics.
+QUALITATIVE_CONTEXTS: Dict[int, List[tuple]] = {
+    # Client 0 — BART / MIT lecture style
     0: [
         (
             "Gradient descent is an iterative optimization algorithm used to minimize a loss function "
@@ -24,7 +26,8 @@ QUALITATIVE_CONTEXTS: Dict[int, List[str]] = {
             "are updated as theta = theta - alpha * gradient, where alpha is the learning rate. Choosing "
             "an appropriate learning rate is critical: too large causes divergence, too small leads to "
             "very slow convergence. Variants such as stochastic gradient descent and mini-batch gradient "
-            "descent are commonly used in practice to reduce computational cost per iteration."
+            "descent are commonly used in practice to reduce computational cost per iteration.",
+            "learning rate scheduling",
         ),
         (
             "Overfitting occurs when a model learns the noise in the training data rather than the "
@@ -32,7 +35,8 @@ QUALITATIVE_CONTEXTS: Dict[int, List[str]] = {
             "such as L1 (Lasso) and L2 (Ridge) penalties add a term proportional to the magnitude of the "
             "weights to the loss function, discouraging the model from assigning large weights to any "
             "single feature. Dropout is another widely used technique that randomly sets activations to "
-            "zero during training, acting as an ensemble of many sub-networks."
+            "zero during training, acting as an ensemble of many sub-networks.",
+            "dropout regularization",
         ),
         (
             "Principal Component Analysis (PCA) is an unsupervised dimensionality reduction technique "
@@ -40,10 +44,11 @@ QUALITATIVE_CONTEXTS: Dict[int, List[str]] = {
             "components) of maximum variance. The first principal component captures the most variance, "
             "the second captures the most remaining variance orthogonal to the first, and so on. PCA "
             "is useful for visualization, noise reduction, and as a preprocessing step before training "
-            "supervised learning models on high-dimensional data."
+            "supervised learning models on high-dimensional data.",
+            "principal components",
         ),
     ],
-    # Client 1 — BART / Stanford CS229 lecture style
+    # Client 1 — T5 / Stanford CS229 lecture style
     1: [
         (
             "The support vector machine (SVM) finds the hyperplane that maximizes the margin between "
@@ -51,7 +56,8 @@ QUALITATIVE_CONTEXTS: Dict[int, List[str]] = {
             "the hyperplane and the nearest data points from each class, called support vectors. SVMs can "
             "handle non-linearly separable data through the kernel trick, which implicitly maps inputs "
             "into a higher-dimensional feature space where a linear separator exists. Common kernels "
-            "include polynomial, radial basis function (RBF), and sigmoid."
+            "include polynomial, radial basis function (RBF), and sigmoid.",
+            "kernel trick",
         ),
         (
             "The Expectation-Maximization (EM) algorithm is an iterative method for finding maximum "
@@ -59,7 +65,8 @@ QUALITATIVE_CONTEXTS: Dict[int, List[str]] = {
             "computes the expected value of the complete-data log-likelihood with respect to the current "
             "parameter estimates. The M-step then maximizes this expectation to obtain new parameter "
             "estimates. EM is guaranteed to increase the observed data log-likelihood at every iteration, "
-            "converging to a local maximum."
+            "converging to a local maximum.",
+            "latent variable estimation",
         ),
         (
             "Bias and variance represent the two main sources of error in supervised learning. Bias "
@@ -67,7 +74,8 @@ QUALITATIVE_CONTEXTS: Dict[int, List[str]] = {
             "to systematic underfitting. Variance is the error from sensitivity to small fluctuations "
             "in the training set and leads to overfitting. The bias-variance trade-off states that "
             "decreasing model complexity increases bias while decreasing variance, and vice versa. "
-            "Cross-validation is commonly used to find the optimal model complexity."
+            "Cross-validation is commonly used to find the optimal model complexity.",
+            "bias-variance tradeoff",
         ),
     ],
     # Client 2 — LED / ML paper abstract style
@@ -79,7 +87,8 @@ QUALITATIVE_CONTEXTS: Dict[int, List[str]] = {
             "to the same document, while treating representations from different documents as negatives. "
             "Empirical evaluation on six downstream benchmarks demonstrates that our approach achieves "
             "state-of-the-art performance, outperforming RoBERTa by 2.3 points on average while requiring "
-            "40% less pretraining compute."
+            "40% less pretraining compute.",
+            "contrastive pretraining",
         ),
         (
             "Sparse attention mechanisms have emerged as a promising approach to scaling transformers "
@@ -88,7 +97,8 @@ QUALITATIVE_CONTEXTS: Dict[int, List[str]] = {
             "each query based on a learned routing function. Unlike fixed patterns such as local windows "
             "or strided attention, our method allows the model to attend to globally relevant tokens "
             "regardless of their position. Experiments on long-document summarization show consistent "
-            "improvements over existing sparse attention baselines."
+            "improvements over existing sparse attention baselines.",
+            "sparse attention patterns",
         ),
         (
             "Federated learning enables training machine learning models across decentralized data "
@@ -97,7 +107,8 @@ QUALITATIVE_CONTEXTS: Dict[int, List[str]] = {
             "from participating clients, but suffers from client drift when data distributions are "
             "heterogeneous. Recent work has explored momentum-based correction, adaptive aggregation, "
             "and personalization strategies to mitigate these issues. However, the case of structurally "
-            "heterogeneous models — where clients train different architectures — remains underexplored."
+            "heterogeneous models — where clients train different architectures — remains underexplored.",
+            "federated aggregation",
         ),
     ],
 }
@@ -134,8 +145,9 @@ class Evaluator:
             # Activate FiLM hooks for generation
             self._activate_hooks(client)
 
-            for ctx in contexts:
-                input_text = PROMPT_TEMPLATE.format(context=ctx)
+            for ctx, topic in contexts:
+                sample = {"context": ctx, "question_topic": topic, "bloom_level": 2}
+                input_text = render_prompt(sample, self.config.conditioning)
                 enc = client.client_model.tokenizer(
                     input_text,
                     max_length=self.config.max_input_len,
@@ -179,7 +191,7 @@ class Evaluator:
         # but we evaluate each client independently with its own tokenizer)
         for client in self.clients:
             cid = client.client_id
-            model_name_short = {0: "C0/T5", 1: "C1/BART", 2: "C2/LED"}[cid]
+            model_name_short = f"C{cid}/{client.client_model.model_family.upper()}"
 
             self._activate_hooks(client)
 
@@ -249,6 +261,7 @@ class Evaluator:
             tokenizer,
             self.config.max_input_len,
             self.config.max_target_len,
+            conditioning=self.config.conditioning,
         )
         loader = DataLoader(
             dataset,

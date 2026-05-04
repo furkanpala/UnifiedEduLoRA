@@ -65,6 +65,7 @@ class Config:
     node_feat_dim: int = 16
     device: str = "cuda"
     output_dir: str = "outputs/"
+    conditioning: str = "baseline"
 
     lora: LoRAConfig = field(default_factory=LoRAConfig)
     gnn: GNNConfig = field(default_factory=GNNConfig)
