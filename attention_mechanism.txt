@@ -1,0 +1,25 @@
+The attention mechanism allows a neural network to focus on different parts of
+an input sequence when producing each element of an output sequence. Rather than
+compressing the entire input into a single fixed-length vector, attention
+computes a weighted sum over all encoder hidden states, where the weights reflect
+how relevant each input position is to the current decoding step.
+
+In the original sequence-to-sequence attention formulation, the decoder produces
+a query vector at each time step. This query is compared against every encoder
+key vector using a compatibility function, typically a dot product or a small
+feedforward network. The resulting scores are passed through a softmax to produce
+a probability distribution, called the attention distribution, which is then used
+to form a context vector as a weighted average of the encoder value vectors.
+
+Scaled dot-product attention, introduced in the Transformer architecture, divides
+the dot products by the square root of the key dimension before applying softmax.
+This scaling prevents the dot products from growing large in magnitude when the
+dimension is high, which would push the softmax into regions with very small
+gradients and slow down learning.
+
+Multi-head attention runs several attention operations in parallel, each with its
+own learned projection matrices for queries, keys, and values. The outputs of all
+heads are concatenated and projected back to the model dimension. Different heads
+can specialise in attending to different types of relationships, such as syntactic
+dependencies, coreference, or positional patterns, giving the model greater
+expressiveness than a single attention head.
