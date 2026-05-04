@@ -30,3 +30,5 @@ example_output/
 # OS
 .DS_Store
 Thumbs.db
+
+clients/

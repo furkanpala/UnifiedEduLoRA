@@ -37,8 +37,17 @@ try:
         from transformers.models.led.modeling_led import LEDAttention
     except ImportError:
         LEDAttention = None  # type: ignore[assignment,misc]
+    try:
+        from transformers.models.led.modeling_led import LEDEncoderAttention
+    except ImportError:
+        LEDEncoderAttention = None  # type: ignore[assignment,misc]
+    try:
+        from transformers.models.led.modeling_led import LEDDecoderAttention
+    except ImportError:
+        LEDDecoderAttention = None  # type: ignore[assignment,misc]
 except ImportError:  # pragma: no cover
     LEDEncoderLayer = LEDDecoderLayer = LEDAttention = None  # type: ignore[assignment,misc]
+    LEDEncoderAttention = LEDDecoderAttention = None  # type: ignore[assignment,misc]
 
 try:
     from transformers.models.longformer.modeling_longformer import LongformerAttention
@@ -56,6 +65,7 @@ def _build_type_map() -> Dict[type, int]:
         (BartAttention, 8), (BartEncoderLayer, 9), (BartDecoderLayer, 10),
         (LEDEncoderLayer, 11), (LEDDecoderLayer, 12),
         (LongformerAttention, 13), (LEDAttention, 14),
+        (LEDEncoderAttention, 15), (LEDDecoderAttention, 16),
     ]:
         if cls is not None:
             mapping[cls] = tid
@@ -115,7 +125,9 @@ def _is_type(module: nn.Module, *types: Optional[type]) -> bool:
 def _node_flags(module: nn.Module) -> Tuple[float, float, float, float, float]:
     """Return (is_attention, is_ff, is_norm, is_embed, has_bias)."""
     is_attn = float(
-        _is_type(module, T5Attention, BartAttention, LEDAttention, LongformerAttention, nn.MultiheadAttention)
+        _is_type(module, T5Attention, BartAttention, LEDAttention,
+                 LEDEncoderAttention, LEDDecoderAttention,
+                 LongformerAttention, nn.MultiheadAttention)
     )
     is_ff = float(_is_type(module, T5LayerFF, nn.Linear))
     is_norm = float(_is_type(module, nn.LayerNorm, T5LayerNorm))
