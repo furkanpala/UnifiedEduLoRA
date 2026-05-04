@@ -30,6 +30,9 @@ from pathlib import Path
 
 REPO_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_DIR))
+sys.path.insert(0, str(Path(__file__).parent))
+
+from _common import load_openai_key, default_key_search_paths
 
 SAVE_EVERY = 10
 
@@ -51,7 +54,10 @@ SOURCES = [
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--openai-api-key", required=True)
+    p.add_argument("--openai-api-key", default=None,
+                   help="Override; otherwise loaded from env / repo / drive.")
+    p.add_argument("--drive-dir",      default=None,
+                   help="Drive root (used to find an openai_api_key file there).")
     p.add_argument("--data-dir",       required=True,
                    help="Directory that contains the source JSON files AND where "
                         "enhanced files will be written.")
@@ -234,8 +240,19 @@ def enhance_dataset(
 def main() -> None:
     args = parse_args()
 
+    if args.openai_api_key and args.openai_api_key.startswith("sk-"):
+        api_key, source = args.openai_api_key, "<--openai-api-key arg>"
+    else:
+        api_key, source = load_openai_key(
+            *default_key_search_paths(str(REPO_DIR), args.drive_dir)
+        )
+    if not api_key:
+        sys.exit("No OpenAI API key found. Pass --openai-api-key, set OPENAI_API_KEY, "
+                 "or place a file named 'openai_api_key' at the repo root.")
+    print(f"OpenAI key loaded from: {source}")
+
     from openai import OpenAI
-    client = OpenAI(api_key=args.openai_api_key)
+    client = OpenAI(api_key=api_key)
 
     data_dir = Path(args.data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)

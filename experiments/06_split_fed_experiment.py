@@ -53,6 +53,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--seed",        type=int,   default=42)
     p.add_argument("--train-ratio", type=float, default=0.80)
     p.add_argument("--val-ratio",   type=float, default=0.10)
+    p.add_argument("--balance-clients", action="store_true",
+                   help="Cap every client at the smallest entry count for a fair "
+                        "controlled comparison. Without this flag, each client uses "
+                        "all of its entries (heterogeneous federated setting).")
     return p.parse_args()
 
 
@@ -106,16 +110,37 @@ def main() -> None:
     rng = random.Random(args.seed)
     test_ratio = 1.0 - args.train_ratio - args.val_ratio
 
-    all_test_samples: list = []
-
+    # First pass: load every client's entries so we know the global minimum
+    # before splitting.
+    loaded: list[tuple[int, str, list]] = []
     for cid, filename in CLIENT_DATASETS:
         src = data_dir / filename
         if not src.exists():
             sys.exit(f"Enhanced file not found: {src}\nRun step 5 first.")
+        loaded.append((cid, filename, _load_json_or_jsonl(src)))
 
-        entries = _load_json_or_jsonl(src)
+    if args.balance_clients:
+        cap = min(len(entries) for _, _, entries in loaded)
+        print(f"\n[balance-clients] capping every client at {cap} entries "
+              f"(smallest dataset).")
+    else:
+        cap = None
+        print("\n[heterogeneous mode] using each client's full data — "
+              "FedAvg will weight by sample count.")
+
+    all_test_samples: list = []
+
+    for cid, filename, entries in loaded:
+        n_full = len(entries)
+
+        # Optional balance: shuffle then take first `cap` entries
+        if cap is not None and n_full > cap:
+            shuffled = list(range(n_full))
+            rng.shuffle(shuffled)
+            entries = [entries[i] for i in shuffled[:cap]]
         n = len(entries)
-        print(f"\nClient {cid} — {filename}: {n} entries")
+        print(f"\nClient {cid} — {filename}: {n} entries"
+              + (f"  (capped from {n_full})" if cap is not None and n_full > cap else ""))
 
         idx = list(range(n))
         rng.shuffle(idx)
