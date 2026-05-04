@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--targets", nargs="+", default=["q_proj", "v_proj"])
 
     # Training hyperparams (forwarded to train_client.py)
-    p.add_argument("--num-epochs",       type=int,   default=60)
+    p.add_argument("--num-epochs",       type=int,   default=100)
     p.add_argument("--batch-size",       type=int,   default=4)
     p.add_argument("--lr",               type=float, default=3e-4)
     p.add_argument("--patience",         type=int,   default=10)
