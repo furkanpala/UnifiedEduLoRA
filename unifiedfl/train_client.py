@@ -666,10 +666,21 @@ def main() -> None:
             print(f"\nWARNING: --global-test-file not found: {global_test_path} — skipping.")
         else:
             print(f"\nEvaluating on global test set: {global_test_path} …")
+            # Model was moved to CPU after the val-set eval to free GPU for the
+            # metric models — move it back before generating on the global test.
+            if device.type == "cuda":
+                client_model.model.to(device)
+                gc.collect()
+                torch.cuda.empty_cache()
             global_test_samples = json.loads(global_test_path.read_text(encoding="utf-8"))
             g_preds, g_refs, g_contexts = _evaluate(
                 client_model, global_test_samples, args, device, use_amp
             )
+            # Move back to CPU before computing the heavy metric models again.
+            if device.type == "cuda":
+                client_model.model.to("cpu")
+                gc.collect()
+                torch.cuda.empty_cache()
             g_quick = compute_all_metrics(g_preds, g_refs, device)
             print(
                 f"  Global ROUGE-L={g_quick['rouge_l']:.3f}  "
