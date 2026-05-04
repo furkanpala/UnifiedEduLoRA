@@ -77,7 +77,7 @@ Useful flags:
 | `--conditionings baseline` | Only run a subset (default: all three) |
 | `--folds 1` | Only run fold 1 |
 | `--force` | Re-run even if `metrics_val.json` exists |
-| `--no-heavy` | Skip UnifiedQA / DeBERTa metrics — faster eval, fewer numbers |
+| `--full-eval` | Enable heavy (UnifiedQA/DeBERTa) + LLM-based metrics (slower, costs API $). Default: fast eval only (ROUGE-L, BLEU-4, BERTScore, local Bloom's classifier) |
 | `--num-epochs 30` | Cut training time |
 
 ### 4. Aggregate

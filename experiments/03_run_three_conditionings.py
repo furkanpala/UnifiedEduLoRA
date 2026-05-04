@@ -59,26 +59,34 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--patience",         type=int,   default=10)
     p.add_argument("--preview-every",    type=int,   default=0)
     p.add_argument("--checkpoint-every", type=int,   default=0)
-    p.add_argument("--no-heavy",         action="store_true",
-                   help="Skip UnifiedQA / DeBERTa metrics in eval")
+    p.add_argument("--full-eval",        action="store_true",
+                   help="Enable heavy (UnifiedQA/DeBERTa) and LLM-based metrics. "
+                        "Default: fast eval only (ROUGE-L, BLEU-4, BERTScore, "
+                        "local Bloom's classifier).")
     p.add_argument("--openai-api-key",   default=None,
-                   help="Override; otherwise loaded from env / repo / drive")
+                   help="Override; otherwise loaded from env / repo / drive. "
+                        "Only used when --full-eval is set.")
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
 
-    # Resolve the API key once for the whole run
-    if args.openai_api_key and args.openai_api_key.startswith("sk-"):
-        api_key, source = args.openai_api_key, "<--openai-api-key arg>"
+    # Resolve the API key — only needed for full eval
+    api_key = None
+    if args.full_eval:
+        if args.openai_api_key and args.openai_api_key.startswith("sk-"):
+            api_key, source = args.openai_api_key, "<--openai-api-key arg>"
+        else:
+            api_key, source = load_openai_key(*default_key_search_paths(REPO_DIR, args.drive_dir))
+        if api_key:
+            os.environ["OPENAI_API_KEY"] = api_key
+            print(f"OpenAI key loaded from: {source}")
+        else:
+            print("WARNING: no OpenAI API key found — LLM-based metrics will be skipped")
     else:
-        api_key, source = load_openai_key(*default_key_search_paths(REPO_DIR, args.drive_dir))
-    if api_key:
-        os.environ["OPENAI_API_KEY"] = api_key
-        print(f"OpenAI key loaded from: {source}")
-    else:
-        print("WARNING: no OpenAI API key found — LLM-based metrics will be skipped")
+        print("Fast eval mode: running ROUGE-L, BLEU-4, BERTScore + local Bloom's classifier only. "
+              "Pass --full-eval to enable heavy/LLM metrics.")
 
     train_script = str(Path(REPO_DIR) / "unifiedfl" / "train_client.py")
 
@@ -114,7 +122,7 @@ def main() -> None:
                 "--checkpoint-every", str(args.checkpoint_every),
                 "--conditioning",     conditioning,
             ]
-            if args.no_heavy:
+            if not args.full_eval:
                 cmd.append("--no-heavy")
             if api_key:
                 cmd += ["--openai-api-key", api_key]
