@@ -74,6 +74,15 @@ def flatten_samples(entries: list, indices: list) -> list:
     return out
 
 
+def _load_json_or_jsonl(path: Path) -> list:
+    text = path.read_text(encoding="utf-8").strip()
+    try:
+        data = json.loads(text)
+        return data if isinstance(data, list) else [data]
+    except json.JSONDecodeError:
+        return [json.loads(l) for l in text.splitlines() if l.strip()]
+
+
 def write_json(path: Path, data: list) -> None:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -95,7 +104,7 @@ def main() -> None:
         if not src.exists():
             sys.exit(f"Enhanced file not found: {src}\nRun step 5 first.")
 
-        entries = json.loads(src.read_text(encoding="utf-8"))
+        entries = _load_json_or_jsonl(src)
         n = len(entries)
         print(f"\nClient {cid} — {filename}: {n} entries")
 

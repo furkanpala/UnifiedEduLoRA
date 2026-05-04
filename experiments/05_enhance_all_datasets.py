@@ -153,6 +153,24 @@ def _annotate_entry(
     return False
 
 
+def _load_json_or_jsonl(path: Path) -> list:
+    """Load a file that is either a JSON array or newline-delimited JSON (JSONL)."""
+    text = path.read_text(encoding="utf-8").strip()
+    try:
+        data = json.loads(text)
+        if isinstance(data, list):
+            return data
+        return [data]
+    except json.JSONDecodeError:
+        # Try JSONL: one JSON object per line
+        entries = []
+        for line in text.splitlines():
+            line = line.strip()
+            if line:
+                entries.append(json.loads(line))
+        return entries
+
+
 def enhance_dataset(
     input_path: Path,
     output_path: Path,
@@ -166,12 +184,12 @@ def enhance_dataset(
     print(f"  {label}: {input_path.name}")
     print(f"{'─'*60}")
 
-    # Load (resume from output if it exists)
+    # Load (resume from output if it exists — always saved as JSON array)
     if output_path.exists():
         entries = json.loads(output_path.read_text(encoding="utf-8"))
         print(f"  Resuming from existing output ({len(entries)} entries).")
     else:
-        entries = json.loads(input_path.read_text(encoding="utf-8"))
+        entries = _load_json_or_jsonl(input_path)
         print(f"  Loaded {len(entries)} entries from source.")
 
     n_skip = sum(1 for e in entries if _already_enhanced(e))
