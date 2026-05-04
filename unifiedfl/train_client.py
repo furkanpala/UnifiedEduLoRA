@@ -44,7 +44,7 @@ from transformers import get_cosine_schedule_with_warmup
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from data.dataset import QADataset
+from data.dataset import QADataset, render_prompt
 from evaluation.metrics import compute_all_metrics, compute_comprehensive_metrics
 from models.client_model import ClientModel
 from utils.logging_utils import setup_logging
@@ -107,6 +107,20 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lora-r",       type=int,   default=16)
     p.add_argument("--lora-alpha",   type=int,   default=32)
     p.add_argument("--lora-dropout", type=float, default=0.1)
+
+    # Conditioning
+    p.add_argument("--conditioning", choices=["baseline", "topic", "bloom"],
+                   default="baseline",
+                   help="Prompt-conditioning mode for both training and evaluation. "
+                        "baseline = context only (uses diverse beam search at eval). "
+                        "topic    = prompt names sample.question_topic. "
+                        "bloom    = prompt names sample.bloom_level.")
+    p.add_argument("--eval-num-return-sequences", type=int, default=5,
+                   help="Only used when --conditioning baseline: K diverse outputs "
+                        "per unique context, then Hungarian-matched to references.")
+    p.add_argument("--eval-num-beams",            type=int, default=10)
+    p.add_argument("--eval-num-beam-groups",      type=int, default=5)
+    p.add_argument("--eval-diversity-penalty",    type=float, default=1.0)
 
     # Checkpointing / resuming
     p.add_argument("--checkpoint-every", type=int, default=10,
@@ -278,13 +292,58 @@ def _evaluate(
     device: torch.device,
     use_amp: bool,
 ) -> tuple[list, list, list]:
-    """Generate for all samples. Returns (preds, refs, contexts) in input order."""
+    """
+    Generate predictions for all val samples, returned in val-sample order so
+    each prediction lines up with its reference.
+
+    Two evaluation strategies depending on --conditioning:
+      - baseline: every val sample sharing a context yields the SAME input, so
+                  deterministic generation collapses to one output for that
+                  context. We therefore (a) deduplicate to unique contexts,
+                  (b) run diverse beam search to produce K distinct outputs per
+                  context, (c) Hungarian-match the K generations to the K refs
+                  via ROUGE-L, then re-expand back into val-sample order.
+      - topic / bloom: every val sample has its own (context + topic-or-bloom)
+                  combination, so the input is unique per sample → standard
+                  deterministic beam search, one output per sample.
+    """
     client_model.model.eval()
+    tokenizer = client_model.tokenizer
+
+    contexts = [s["context"] for s in samples]
+    references = [
+        f"Question: {s['question']}\nAnswer: {s['answer']}" for s in samples
+    ]
+
+    if args.conditioning == "baseline":
+        preds = _evaluate_baseline_diverse(
+            client_model, samples, references, args, device, use_amp,
+        )
+    else:
+        preds = _evaluate_per_sample(
+            client_model, samples, args, device, use_amp,
+        )
+
+    client_model.model.train()
+    return preds, references, contexts
+
+
+@torch.no_grad()
+def _evaluate_per_sample(
+    client_model: ClientModel,
+    samples: list,
+    args: argparse.Namespace,
+    device: torch.device,
+    use_amp: bool,
+) -> list:
+    """One forward pass per sample — input is unique because of conditioning."""
+    tokenizer = client_model.tokenizer
     loader = DataLoader(
-        QADataset(samples, client_model.tokenizer, args.max_input_len, args.max_target_len),
+        QADataset(samples, tokenizer, args.max_input_len, args.max_target_len,
+                  conditioning=args.conditioning),
         batch_size=args.batch_size, shuffle=False, num_workers=0,
     )
-    preds, refs = [], []
+    preds: list = []
     for batch in loader:
         with torch.amp.autocast("cuda", enabled=use_amp, dtype=torch.bfloat16):
             out = client_model.generate(
@@ -294,13 +353,78 @@ def _evaluate(
                 no_repeat_ngram_size=3, early_stopping=True,
             )
         for ids in out:
-            preds.append(client_model.tokenizer.decode(ids, skip_special_tokens=True))
-        for lab in batch["labels"]:
-            lab = lab.masked_fill(lab == -100, client_model.tokenizer.pad_token_id)
-            refs.append(client_model.tokenizer.decode(lab, skip_special_tokens=True))
-    contexts = [s["context"] for s in samples]
-    client_model.model.train()
-    return preds, refs, contexts
+            preds.append(tokenizer.decode(ids, skip_special_tokens=True))
+    return preds
+
+
+@torch.no_grad()
+def _evaluate_baseline_diverse(
+    client_model: ClientModel,
+    samples: list,
+    references: list,
+    args: argparse.Namespace,
+    device: torch.device,
+    use_amp: bool,
+) -> list:
+    """
+    Group val samples by context, run diverse beam search per unique context,
+    Hungarian-match generations to that context's references, then re-emit
+    predictions in original val-sample order.
+    """
+    from collections import defaultdict
+    import numpy as np
+    from rouge_score import rouge_scorer
+    from scipy.optimize import linear_sum_assignment
+
+    scorer = rouge_scorer.RougeScorer(["rougeL"], use_stemmer=True)
+    tokenizer = client_model.tokenizer
+
+    groups: dict = defaultdict(list)  # context → list of original indices
+    for i, s in enumerate(samples):
+        groups[s["context"]].append(i)
+
+    K = args.eval_num_return_sequences
+    preds: list = [None] * len(samples)
+
+    for ctx, idxs in groups.items():
+        sample = samples[idxs[0]]  # any of them — they share context
+        prompt = render_prompt(sample, "baseline")
+        enc = tokenizer(prompt, max_length=args.max_input_len,
+                        truncation=True, padding=False, return_tensors="pt").to(device)
+
+        with torch.amp.autocast("cuda", enabled=use_amp, dtype=torch.bfloat16):
+            out = client_model.model.generate(
+                input_ids=enc["input_ids"],
+                attention_mask=enc["attention_mask"],
+                num_beams=args.eval_num_beams,
+                num_beam_groups=args.eval_num_beam_groups,
+                diversity_penalty=args.eval_diversity_penalty,
+                num_return_sequences=K,
+                max_new_tokens=args.max_target_len,
+                no_repeat_ngram_size=3,
+                early_stopping=True,
+            )
+        gens = [tokenizer.decode(ids, skip_special_tokens=True) for ids in out]
+
+        # Hungarian-match generations to this group's references
+        local_refs = [references[i] for i in idxs]
+        m, n = len(gens), len(local_refs)
+        size = max(m, n)
+        cost = np.full((size, size), 1.0)
+        for i, g in enumerate(gens):
+            for j, r in enumerate(local_refs):
+                cost[i, j] = 1.0 - scorer.score(r, g)["rougeL"].fmeasure
+        row_idx, col_idx = linear_sum_assignment(cost)
+        # row=gen, col=ref. Place gens in original sample order.
+        for i, j in zip(row_idx, col_idx):
+            if i < m and j < n:
+                orig_idx = idxs[j]
+                preds[orig_idx] = gens[i]
+        # Fill any unmatched slot with the first generation
+        for j, orig_idx in enumerate(idxs):
+            if preds[orig_idx] is None:
+                preds[orig_idx] = gens[0] if gens else ""
+    return preds
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
@@ -342,11 +466,13 @@ def main() -> None:
 
     # DataLoaders
     train_loader = DataLoader(
-        QADataset(train_samples, client_model.tokenizer, args.max_input_len, args.max_target_len),
+        QADataset(train_samples, client_model.tokenizer, args.max_input_len,
+                  args.max_target_len, conditioning=args.conditioning),
         batch_size=args.batch_size, shuffle=True, num_workers=2, pin_memory=pin_mem,
     )
     val_loader = DataLoader(
-        QADataset(val_samples, client_model.tokenizer, args.max_input_len, args.max_target_len),
+        QADataset(val_samples, client_model.tokenizer, args.max_input_len,
+                  args.max_target_len, conditioning=args.conditioning),
         batch_size=args.batch_size, shuffle=False, num_workers=2, pin_memory=pin_mem,
     )
 
