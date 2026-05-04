@@ -453,6 +453,12 @@ def main() -> None:
         if args.checkpoint_every_round > 0 and (round_idx + 1) % args.checkpoint_every_round == 0:
             _save_round_checkpoint(clients, round_idx, ckpt_base)
 
+    # ── Save the final-round state BEFORE restoring the best snapshot ────────
+    # This preserves the round-N model so it can be loaded later for comparison.
+    final_round_dir = output_dir / "fed_final_round"
+    print(f"\nSaving final-round (round {cfg.num_rounds}) state → {final_round_dir}")
+    _save_snapshot(clients, final_round_dir)
+
     # ── Restore best snapshot before final evaluation ────────────────────────
     if best_round > 0 and best_snapshot_dir.exists():
         print(f"\n{'=' * 60}")
@@ -496,7 +502,8 @@ def main() -> None:
             f"BERTScore={final_metrics['bertscore_f1']:.3f}"
         )
 
-    # Save final models
+    # Save the (now-restored best) state to fed_final/ — this is the model
+    # whose metrics are reported in final_metrics_per_client.json.
     final_dir = output_dir / "fed_final"
     for client in clients:
         cdir = final_dir / f"client_{client.client_id}"
@@ -504,7 +511,14 @@ def main() -> None:
         client.client_model.model.save_pretrained(str(cdir / "lora_model"))
         torch.save(client.film_adapter.state_dict(), cdir / "film.pt")
     torch.save(clients[0].gnn.state_dict(), final_dir / "gnn.pt")
-    print(f"\nFinal models saved → {final_dir}")
+
+    print(f"\n{'=' * 60}")
+    print("  Saved model artifacts:")
+    print(f"  • {final_dir}/  — best snapshot (round {best_round}); "
+          f"used for reported metrics")
+    print(f"  • {final_round_dir}/  — actual final-round state (round {cfg.num_rounds})")
+    print(f"  • {best_snapshot_dir}/  — same as fed_final/, kept inside fed_checkpoints/")
+    print(f"{'=' * 60}")
 
 
 if __name__ == "__main__":
