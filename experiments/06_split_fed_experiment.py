@@ -76,11 +76,20 @@ def flatten_samples(entries: list, indices: list) -> list:
 
 def _load_json_or_jsonl(path: Path) -> list:
     text = path.read_text(encoding="utf-8").strip()
-    try:
-        data = json.loads(text)
-        return data if isinstance(data, list) else [data]
-    except json.JSONDecodeError:
-        return [json.loads(l) for l in text.splitlines() if l.strip()]
+    if not text:
+        return []
+    if text.startswith("["):
+        return json.loads(text)
+    decoder = json.JSONDecoder()
+    entries, idx = [], 0
+    while idx < len(text):
+        while idx < len(text) and text[idx] in " \t\n\r":
+            idx += 1
+        if idx >= len(text):
+            break
+        obj, idx = decoder.raw_decode(text, idx)
+        entries.append(obj)
+    return entries
 
 
 def write_json(path: Path, data: list) -> None:

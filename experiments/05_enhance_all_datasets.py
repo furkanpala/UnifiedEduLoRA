@@ -154,21 +154,33 @@ def _annotate_entry(
 
 
 def _load_json_or_jsonl(path: Path) -> list:
-    """Load a file that is either a JSON array or newline-delimited JSON (JSONL)."""
+    """
+    Load a file containing JSON in any of these formats:
+      - A single JSON array  [ {...}, {...} ]
+      - JSONL (one object per line)
+      - Concatenated top-level objects (multi-line, no wrapping array)
+    """
     text = path.read_text(encoding="utf-8").strip()
-    try:
-        data = json.loads(text)
-        if isinstance(data, list):
-            return data
-        return [data]
-    except json.JSONDecodeError:
-        # Try JSONL: one JSON object per line
-        entries = []
-        for line in text.splitlines():
-            line = line.strip()
-            if line:
-                entries.append(json.loads(line))
-        return entries
+    if not text:
+        return []
+
+    # Fast path: wrapped array
+    if text.startswith("["):
+        return json.loads(text)
+
+    # General path: consume one top-level object at a time with raw_decode.
+    # This handles both JSONL and multi-line concatenated objects.
+    decoder = json.JSONDecoder()
+    entries, idx = [], 0
+    while idx < len(text):
+        # Skip whitespace between objects
+        while idx < len(text) and text[idx] in " \t\n\r":
+            idx += 1
+        if idx >= len(text):
+            break
+        obj, idx = decoder.raw_decode(text, idx)
+        entries.append(obj)
+    return entries
 
 
 def enhance_dataset(
