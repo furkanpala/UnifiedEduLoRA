@@ -236,6 +236,9 @@ def compute_faithfulness(
                 raw = resp.choices[0].message.content.strip()
                 raw = re.sub(r"^```(?:json)?\s*", "", raw)
                 raw = re.sub(r"\s*```$", "", raw)
+                # Escape lone backslashes (e.g. \alpha, \lambda from math notation)
+                # that are not valid JSON escape sequences.
+                raw = re.sub(r'\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})', r'\\\\', raw)
                 return json.loads(raw).get("claims", sent_tokenize(answer))
             except Exception as e:
                 logger.warning(f"LLM claim decomposition failed, falling back to sent_tokenize: {e}")
@@ -252,7 +255,9 @@ def compute_faithfulness(
             doc_scores.append(0.0)
             continue
         # Batch NLI: premise=ctx, hypothesis=claim
-        pairs = [{"text": ctx[:1024], "text_pair": c} for c in claims]
+        # DeBERTa-v3-small has a 512-token limit; 400 chars stays safely under it
+        # even for dense technical ML text.
+        pairs = [{"text": ctx[:400], "text_pair": c} for c in claims]
         results = pipe(pairs)
         entailed = [1.0 if "entail" in r["label"].lower() else 0.0 for r in results]
         doc_scores.append(float(np.mean(entailed)))
@@ -336,14 +341,26 @@ def compute_rquge(
     if not qa_answers:
         return 1.0
 
+    # Filter out empty candidates before calling bscore to avoid the
+    # "Empty candidate sentence" warning; reinsert 0.0 for those slots.
+    valid_mask = [bool(qa.strip()) for qa in qa_answers]
+    valid_qa   = [qa  for qa, m in zip(qa_answers,  valid_mask) if m]
+    valid_ref  = [ref for ref, m in zip(ref_answers, valid_mask) if m]
+
+    if not valid_qa:
+        return 1.0
+
     _, _, F1 = bscore(
-        qa_answers, ref_answers,
+        valid_qa, valid_ref,
         model_type="distilbert-base-uncased",
         device=str(device), verbose=False,
     )
+    f1_iter = iter(F1.tolist())
+    f1_list = [next(f1_iter) if m else 0.0 for m in valid_mask]
+
     # Scale [0, 1] → [1, 5], clamped because BertScore can occasionally
     # produce values slightly outside [0, 1].
-    f1_mean = float(F1.mean().item())
+    f1_mean = float(np.mean(f1_list))
     f1_mean = max(0.0, min(1.0, f1_mean))
     return 1.0 + 4.0 * f1_mean
 
@@ -387,6 +404,7 @@ def compute_answer_relevancy(
             raw = resp.choices[0].message.content.strip()
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)
+            raw = re.sub(r'\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})', r'\\\\', raw)
             return json.loads(raw).get("questions", [])
         except Exception as e:
             logger.warning(f"Reverse-question generation failed: {e}")
@@ -559,6 +577,7 @@ def compute_blooms_llm(
             raw = resp.choices[0].message.content.strip()
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)
+            raw = re.sub(r'\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})', r'\\\\', raw)
             parsed = json.loads(raw)
             level  = int(parsed["level"])
             reason = parsed.get("reason", "")
