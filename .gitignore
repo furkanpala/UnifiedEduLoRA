@@ -1,6 +1,10 @@
 # API keys — never commit these
+openai_api_key
+**/openai_api_key
 openai_api_key.py
 **/openai_api_key.py
+openai_api_key.txt
+**/openai_api_key.txt
 .env
 **/.env
 
