@@ -55,10 +55,18 @@ def parse_args() -> argparse.Namespace:
                    help="HF base model id, e.g. facebook/bart-base")
     p.add_argument("--num-return-sequences", type=int, default=5,
                    help="Number of diverse outputs per context (= refs per context)")
+    p.add_argument("--decoding", choices=["dbs", "sampling"], default="dbs",
+                   help="dbs = diverse beam search (recommended); "
+                        "sampling = nucleus + top-k (no remote code required)")
     p.add_argument("--num-beam-groups",      type=int, default=5)
     p.add_argument("--num-beams",            type=int, default=10,
                    help="Total beams; must be a multiple of num-beam-groups")
     p.add_argument("--diversity-penalty",    type=float, default=1.0)
+    p.add_argument("--top-p",                type=float, default=0.95,
+                   help="Nucleus sampling p (only used when --decoding sampling)")
+    p.add_argument("--top-k",                type=int,   default=50,
+                   help="Top-k sampling cutoff (only used when --decoding sampling)")
+    p.add_argument("--temperature",          type=float, default=1.0)
     p.add_argument("--max-input-len",        type=int,   default=512)
     p.add_argument("--max-target-len",       type=int,   default=128)
     p.add_argument("--device",               default="cuda")
@@ -91,17 +99,34 @@ def _generate_diverse(
     prompt = PROMPT_TEMPLATE.format(context=context)
     enc = tokenizer(prompt, max_length=args.max_input_len,
                     truncation=True, padding=False, return_tensors="pt").to(device)
-    out = model.generate(
+    common = dict(
         input_ids=enc["input_ids"],
         attention_mask=enc["attention_mask"],
-        num_beams=args.num_beams,
-        num_beam_groups=args.num_beam_groups,
-        diversity_penalty=args.diversity_penalty,
         num_return_sequences=args.num_return_sequences,
         max_new_tokens=args.max_target_len,
         no_repeat_ngram_size=3,
-        early_stopping=True,
     )
+    if args.decoding == "dbs":
+        # Diverse beam search. Recent transformers (>=4.50) moved DBS to a
+        # custom-code repo, so pass the migration kwargs unconditionally.
+        out = model.generate(
+            **common,
+            num_beams=args.num_beams,
+            num_beam_groups=args.num_beam_groups,
+            diversity_penalty=args.diversity_penalty,
+            early_stopping=True,
+            custom_generate="transformers-community/group-beam-search",
+            trust_remote_code=True,
+        )
+    else:
+        # Nucleus + top-k sampling — fully local, no remote code.
+        out = model.generate(
+            **common,
+            do_sample=True,
+            top_p=args.top_p,
+            top_k=args.top_k,
+            temperature=args.temperature,
+        )
     return [tokenizer.decode(ids, skip_special_tokens=True) for ids in out]
 
 
@@ -156,9 +181,14 @@ def main() -> None:
     print(f"  refs per context = {len(records) // max(len(groups), 1)}")
 
     # ── Generate K diverse outputs per context ───────────────────────────────
-    print(f"\nGenerating {args.num_return_sequences} diverse outputs per context "
-          f"(num_beams={args.num_beams}, groups={args.num_beam_groups}, "
-          f"diversity_penalty={args.diversity_penalty}) …")
+    if args.decoding == "dbs":
+        print(f"\nGenerating {args.num_return_sequences} diverse outputs per context "
+              f"[diverse beam search: beams={args.num_beams}, groups={args.num_beam_groups}, "
+              f"diversity_penalty={args.diversity_penalty}] …")
+    else:
+        print(f"\nGenerating {args.num_return_sequences} diverse outputs per context "
+              f"[sampling: top_p={args.top_p}, top_k={args.top_k}, "
+              f"temperature={args.temperature}] …")
 
     matched_preds: List[str] = []
     matched_refs:  List[str] = []
@@ -215,12 +245,24 @@ def main() -> None:
 
     # ── Persist outputs ───────────────────────────────────────────────────────
     out_metrics = fold_dir / f"metrics_val_{args.output_suffix}.json"
-    out_metrics.write_text(json.dumps({
-        "decoding": "diverse_beam_search",
-        "num_beams": args.num_beams,
-        "num_beam_groups": args.num_beam_groups,
-        "diversity_penalty": args.diversity_penalty,
+    cfg = {
+        "decoding": "diverse_beam_search" if args.decoding == "dbs" else "sampling",
         "num_return_sequences": args.num_return_sequences,
+    }
+    if args.decoding == "dbs":
+        cfg.update({
+            "num_beams": args.num_beams,
+            "num_beam_groups": args.num_beam_groups,
+            "diversity_penalty": args.diversity_penalty,
+        })
+    else:
+        cfg.update({
+            "top_p": args.top_p,
+            "top_k": args.top_k,
+            "temperature": args.temperature,
+        })
+    out_metrics.write_text(json.dumps({
+        **cfg,
         "n_unique_contexts": len(groups),
         "mean_distinct_generations": float(np.mean(distinct_counts)),
         "matching": "hungarian_max_rougeL",
