@@ -30,13 +30,31 @@ try:
 except ImportError:
     LEDEncoderLayer = LEDDecoderLayer = None  # type: ignore[assignment,misc]
 
+try:
+    from transformers.models.pegasus_x.modeling_pegasus_x import (
+        PegasusXEncoderLayer,
+        PegasusXDecoderLayer,
+    )
+except ImportError:
+    PegasusXEncoderLayer = PegasusXDecoderLayer = None  # type: ignore[assignment,misc]
+
+try:
+    from transformers.models.marian.modeling_marian import (
+        MarianEncoderLayer,
+        MarianDecoderLayer,
+    )
+except ImportError:
+    MarianEncoderLayer = MarianDecoderLayer = None  # type: ignore[assignment,misc]
+
 _FAMILY_TARGETS: Dict[str, Tuple[type, ...]] = {}
 
 def _build_family_targets() -> None:
     for key, types in [
-        ("t5",   [T5Block]),
-        ("bart", [BartEncoderLayer, BartDecoderLayer]),
-        ("led",  [LEDEncoderLayer, LEDDecoderLayer]),
+        ("t5",        [T5Block]),
+        ("bart",      [BartEncoderLayer, BartDecoderLayer]),
+        ("led",       [LEDEncoderLayer, LEDDecoderLayer]),
+        ("pegasus_x", [PegasusXEncoderLayer, PegasusXDecoderLayer]),
+        ("marian",    [MarianEncoderLayer, MarianDecoderLayer]),
     ]:
         valid = tuple(t for t in types if t is not None)
         if valid:

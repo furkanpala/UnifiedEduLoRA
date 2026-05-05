@@ -80,7 +80,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--fold",      type=int, required=True, choices=[1, 2, 3],
                    help="Which CV fold to train on (1, 2, or 3)")
     p.add_argument("--model",     required=True, help="HuggingFace model ID")
-    p.add_argument("--family",    required=True, choices=["t5", "bart", "led"])
+    p.add_argument("--family",    required=True,
+                   choices=["t5", "bart", "led", "pegasus_x", "marian"])
     p.add_argument("--targets",   nargs="+", required=True,
                    help="LoRA target module names, e.g. --targets q v")
 

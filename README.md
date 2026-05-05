@@ -372,6 +372,8 @@ Comprehensive evaluation (ROUGE-L, BLEU-4, BERTScore + RTC, Faithfulness, QAFact
 | Flan-T5-base | `google/flan-t5-base` | `t5` | `q v` |
 | BART-base | `facebook/bart-base` | `bart` | `q_proj v_proj` |
 | LED-base | `allenai/led-base-16384` | `led` | `q_proj v_proj` |
+| Pegasus-X-base | `google/pegasus-x-base` | `pegasus_x` | `q_proj v_proj` |
+| MarianMT (en→de) | `Helsinki-NLP/opus-mt-en-de` | `marian` | `q_proj v_proj` |
 
 ---
 

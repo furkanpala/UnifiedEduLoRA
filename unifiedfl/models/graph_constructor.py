@@ -54,6 +54,29 @@ try:
 except ImportError:  # pragma: no cover
     LongformerAttention = None  # type: ignore[assignment,misc]
 
+try:
+    from transformers.models.pegasus_x.modeling_pegasus_x import (
+        PegasusXAttention,
+        PegasusXEncoderLayer,
+        PegasusXDecoderLayer,
+    )
+    try:
+        from transformers.models.pegasus_x.modeling_pegasus_x import PegasusXEncoderEphemeralLayer
+    except ImportError:
+        PegasusXEncoderEphemeralLayer = None  # type: ignore[assignment,misc]
+except ImportError:  # pragma: no cover
+    PegasusXAttention = PegasusXEncoderLayer = PegasusXDecoderLayer = None  # type: ignore[assignment,misc]
+    PegasusXEncoderEphemeralLayer = None  # type: ignore[assignment,misc]
+
+try:
+    from transformers.models.marian.modeling_marian import (
+        MarianAttention,
+        MarianEncoderLayer,
+        MarianDecoderLayer,
+    )
+except ImportError:  # pragma: no cover
+    MarianAttention = MarianEncoderLayer = MarianDecoderLayer = None  # type: ignore[assignment,misc]
+
 logger = logging.getLogger("federated_qa")
 
 # ── Layer-type ID mapping ────────────────────────────────────────────────────
@@ -66,6 +89,9 @@ def _build_type_map() -> Dict[type, int]:
         (LEDEncoderLayer, 11), (LEDDecoderLayer, 12),
         (LongformerAttention, 13), (LEDAttention, 14),
         (LEDEncoderAttention, 15), (LEDDecoderAttention, 16),
+        (PegasusXAttention, 17), (PegasusXEncoderLayer, 18), (PegasusXDecoderLayer, 19),
+        (PegasusXEncoderEphemeralLayer, 20),
+        (MarianAttention, 21), (MarianEncoderLayer, 22), (MarianDecoderLayer, 23),
     ]:
         if cls is not None:
             mapping[cls] = tid
