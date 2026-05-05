@@ -95,7 +95,7 @@
 
 % ── Title ─────────────────────────────────────────────────────
 \title{\UniEdu{}: Equitable Automated Q\&A Generation\\
-       via Architecture-Aware Federated Learning}
+       via Unified Federated Learning}
 
 \author{
   Furkan Pala \and
@@ -956,7 +956,7 @@ the all-clients-each-round default; verify final round
 counts and any warm-up.}
 
 \begin{algorithm}[t]
-\caption{\UniEdu{}: architecture-aware federated AQAG.}
+\caption{\UniEdu{}: unified federated learning for AQAG.}
 \label{alg:unifiededu}
 \begin{algorithmic}[1]
 \Require $m$ institutions; private datasets
@@ -1219,42 +1219,68 @@ conditioned on additional fields:
 \subsection{Baselines}
 \label{sec:baselines}
 
-We compare \UniEdu{} against:
+The two hypotheses in \S\ref{sec:scenario} require
+distinct sets of comparators.
+
+\paragraph{For H1 (equity).}
+We compare \UniEdu{} against \emph{federation-level}
+methods that, like \UniEdu{}, assume a federation of
+SLMs and evaluate per-institution QA quality on
+the same val set:
 \begin{itemize}[leftmargin=1.5em, itemsep=2pt]
-  \item \textbf{Individual SLM (lower bound).} Each
+  \item \textbf{Indiv} (lower bound). Each
   institution trains its SLM with a private LoRA
   adapter on its own data, with no federation. Three
-  conditioning regimes per institution.
-  \item \textbf{LoRA-FedAvg (within-family).} For any
-  pair of institutions sharing an SLM family,
-  aggregate LoRA weights via vanilla
-  FedAvg~\citep{mcmahan2017communication}. Anchors the
-  comparison against the standard FL practice when
-  architectures match. \red{TODO: confirm whether any
-  pair in the private testbed shares an architecture;
-  if not, report this on synthetic same-architecture
-  splits drawn from the public testbed.}
-  \item \textbf{\UniEdu{}-static}: architecture-graph
-  features fixed at round 0, no per-batch refresh of
-  effective-weight statistics. Ablates the dynamic
-  feature update.
-  \item \textbf{\UniEdu{}-noFiLM}: GAT trained but its
-  embeddings unused at the LM forward. Ablates the
-  conditioning channel.
-  \item \textbf{\UniEdu{} (full)}: GAT-FedAvg, LoRA
+  conditioning regimes per institution
+  (\S\ref{sec:conditioning}).
+  \item
+  \textbf{FedKD}~\citep{wu2022fedkd}.
+  Communication-efficient federated learning via
+  knowledge distillation: each client trains a small
+  ``mentee'' model that distils both the local
+  ``mentor'' and the federated ensemble; only mentee
+  parameters are exchanged. Re-implemented for our
+  AQAG-on-SLM setting; details in
+  Appendix~\ref{app:fedkd_implementation}.
+  \red{TODO: implement FedKD in unifiedfl/.}
+  \item \textbf{Benchmark B3.} \red{TODO: confirm with
+  Furkan which heterogeneous-FL or personalised-FL
+  baseline to include here (candidates: HeteroFL,
+  InclusiveFL, FedRep, pFedHN). Insert citation and
+  one-line description.}
+  \item \textbf{Benchmark B4.} \red{TODO: TBD.}
+  \item \textbf{Benchmark B5.} \red{TODO: TBD.}
+  \item \textbf{\UniEdu{}-static} (ablation):
+  architecture-graph features fixed at round~0, no
+  per-batch refresh of effective-weight statistics.
+  Ablates the dynamic feature update.
+  \item \textbf{\UniEdu{}-noFiLM} (ablation):
+  GAT trained but its embeddings unused at the LM
+  forward. Ablates the conditioning channel.
+  \item \textbf{\UniEdu{}} (full): GAT-FedAvg, LoRA
   and FiLM client-local, per-batch effective-weight
   refresh.
-  \item \textbf{Single-LLM ceiling.} Zero-shot GPT-4o
-  prompted to produce a (question, answer) pair from
-  each test context, run through the same evaluation
-  suite. The single-LLM number is what we ask the SLM
-  federation to approach.
 \end{itemize}
-We also report a \textbf{diverse-LLM panel} ---
-zero-shot Llama-3.1-8B-Instruct, Qwen-2.5-7B-Instruct,
-Mistral-7B-Instruct, and Gemini-1.5-Flash --- as
-additional reference points
-(Appendix~\ref{app:llm_baselines}).
+
+\paragraph{For H2 (LLM approximation).}
+We compare the federated mixture of all SLMs ---
+i.e., \UniEdu{} aggregated across institutions, not
+each institution in isolation --- against
+single-model LLMs prompted zero-shot to produce a
+$(q, a)$ pair from each test context, run through
+the same evaluation suite:
+\begin{itemize}[leftmargin=1.5em, itemsep=2pt]
+  \item \textbf{GPT-4o} \red{(headline ceiling)}.
+  \item \textbf{GPT-4o-mini}.
+  \item \textbf{Llama-3.1-8B-Instruct}~\citep{grattafiori2024llama3}.
+  \item \textbf{Qwen-2.5-7B-Instruct}~\citep{bai2023qwen}.
+  \item \textbf{Mistral-7B-Instruct}~\citep{jiang2023mistral}.
+  \item \textbf{Gemini-1.5-Flash}.
+\end{itemize}
+The H2 panel is reported separately
+(\S\ref{sec:results_llm_approx},
+Appendix~\ref{app:llm_baselines}); these LLMs do not
+appear as rows in the per-institution H1 tables.
 
 \subsection{Hyperparameters}
 \label{sec:hyperparams}
@@ -1543,111 +1569,213 @@ size, and \textbf{95\,\% bootstrap CIs}
 \section{Results}
 \label{sec:results}
 
-We report results across two testbeds and three
-training paradigms. The single-LLM ceiling
-(\textbf{GPT-4o}) is reported per institution by
-prompting GPT-4o to produce a $(q, a)$ from each
-test context and running the same evaluation suite.
-\textbf{Indiv} is each institution's locally
-fine-tuned SLM (no federation). \textbf{\UniEdu{}}
-is the full framework. All metrics are reported as
-mean over 3-fold cross-validation on the val set
-unless otherwise stated. The text-overlap metrics
-(ROUGE-L, BLEU-4, BERTScore-F1) are higher-is-better
-in $[0, 1]$. RTC, Faithfulness, QAFactEval, and
-Answer-Relevancy are higher-is-better in $[0, 1]$.
-RQUGE is higher-is-better in $[1, 5]$. Bloom EVS is
-higher-is-better in $[0, 1]$ (Eq.~\ref{eq:evs}).
-LLM-judge overall is higher-is-better in $[0, 1]$
-(Eq.~\ref{sec:llm_judge}).
+The two hypotheses (\S\ref{sec:scenario}) are
+reported separately. \S\ref{sec:results_equity} and
+\S\ref{sec:results_kti} test \textbf{H1} (equity)
+by comparing \UniEdu{} against per-institution local
+training and other federation methods. The result
+for the equity story is \emph{per-institution};
+GPT-4o does not appear as a row.
+\S\ref{sec:results_llm_approx} tests \textbf{H2}
+(LLM approximation) by aggregating \UniEdu{}'s
+output across the federation and comparing the
+aggregate against single-LLM zero-shot baselines.
+All metrics are reported as the mean over 3-fold
+cross-validation on the val set unless otherwise
+stated. Score directions: ROUGE-L / BLEU-4 /
+BERTScore-F1 / RTC / Faithfulness / QAFactEval /
+Answer-Relevancy / Bloom-EVS / LLM-judge overall are
+all higher-is-better in $[0, 1]$. RQUGE is
+higher-is-better in $[1, 5]$. The Pairwise Equity
+Score $\bar{E}$ (Eq.~\ref{eq:pairwise_equity}) is
+higher-is-better and unbounded above.
 
-\subsection{Public Testbed}
-\label{sec:results_public}
+\subsection{H1 — Equity Comparison}
+\label{sec:results_equity}
 
-\red{TODO: fill in once Phase~2 finishes for all
-three public-testbed clients. Numbers below are
-placeholders.}
+We compare \UniEdu{} against \textbf{Indiv},
+\textbf{FedKD}~\citep{wu2022fedkd}, and three
+additional benchmarks (\S\ref{sec:baselines})
+on the public testbed (Table~\ref{tab:equity_public})
+and the private testbed
+(Table~\ref{tab:equity_private}).
 
 \begin{table*}[t]
 \centering
 \small
-\caption{Public testbed (\S\ref{sec:public_testbed}):
-text-overlap and reference-free QA-quality metrics on
-the val set. Each cell is the mean over 3 folds.
-Bold = best per (institution, metric);
-\underline{underline} = approaches GPT-4o ($\Delta < 0.02$).}
-\label{tab:public_quality}
-\begin{tabular}{llccccccc}
+\caption{Equity comparison on the \textbf{public
+testbed} (\S\ref{sec:public_testbed}). Per-institution
+QA-quality metrics on the val set (mean over 3 folds).
+$\bar{E}$ is the institution's mean Pairwise Equity
+Score against the other clients in the same paradigm
+(Eq.~\ref{eq:pairwise_equity}; higher = both clients
+do well \emph{despite} resource asymmetry).
+GPT-4o is intentionally not a row here --- the
+LLM-approximation comparison is reported separately in
+Table~\ref{tab:llm_approx}. Bold = best per
+(institution, metric).}
+\label{tab:equity_public}
+\begin{tabular}{llcccccccc}
 \toprule
-\textbf{Institution} & \textbf{Paradigm} &
-\textbf{ROUGE-L} & \textbf{BLEU-4} & \textbf{BERTScore} &
+\textbf{Institution} & \textbf{Method} &
+\textbf{ROUGE-L} & \textbf{BLEU-4} & \textbf{BERT-F1} &
 \textbf{RTC} & \textbf{Faith.} & \textbf{QAFactEval} &
-\textbf{RQUGE} \\
+\textbf{RQUGE} & $\bar{E}$ \\
 \midrule
-\multirow{3}{*}{$\mathcal{I}_0$ (BART-base, MIT)}
-  & Indiv      &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
-  & \UniEdu{}  &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
-  & GPT-4o     &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
+\multirow{6}{*}{$\mathcal{I}_0$ (BART, MIT)}
+  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
-\multirow{3}{*}{$\mathcal{I}_1$ (Flan-T5-base, Stanford)}
-  & Indiv      &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
-  & \UniEdu{}  &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
-  & GPT-4o     &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
+\multirow{6}{*}{$\mathcal{I}_1$ (Flan-T5, Stanford)}
+  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
-\multirow{3}{*}{$\mathcal{I}_2$ (LED-base, ML papers)}
-  & Indiv      &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
-  & \UniEdu{}  &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
-  & GPT-4o     &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
+\multirow{6}{*}{$\mathcal{I}_2$ (LED, ML papers)}
+  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
-\multirow{3}{*}{Mean across $\mathcal{I}_{0,1,2}$}
-  & Indiv      &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
-  & \UniEdu{}  &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
-  & GPT-4o     &     --     &     --     &     --     &     --     &     --     &     --     &     --     \\
+\multirow{6}{*}{Mean across $\mathcal{I}_{0,1,2}$}
+  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Equity comparison on the \textbf{private
+testbed} (\S\ref{sec:private_testbed}). Same layout
+as Table~\ref{tab:equity_public} with five
+institutions instead of three.}
+\label{tab:equity_private}
+\begin{tabular}{llcccccccc}
+\toprule
+\textbf{Institution / SLM} & \textbf{Method} &
+\textbf{ROUGE-L} & \textbf{BLEU-4} & \textbf{BERT-F1} &
+\textbf{RTC} & \textbf{Faith.} & \textbf{QAFactEval} &
+\textbf{RQUGE} & $\bar{E}$ \\
+\midrule
+\multirow{6}{*}{$\mathcal{I}_0$ / BART-base}
+  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multirow{6}{*}{$\mathcal{I}_1$ / Flan-T5-base}
+  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multirow{6}{*}{$\mathcal{I}_2$ / LED-base-16384}
+  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multirow{6}{*}{$\mathcal{I}_3$ / Pegasus-X-base}
+  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multirow{6}{*}{$\mathcal{I}_4$ / ProphetNet-large}
+  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multirow{6}{*}{Mean across $\mathcal{I}_{0..4}$}
+  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Pedagogical and LLM-judge metrics on the
+\textbf{public testbed}. Bloom-EVS is in $[0, 1]$
+(Eq.~\ref{eq:evs}); LLM-judge is the overall mean
+across the four rubric dimensions, also in $[0, 1]$.
+Same set of methods as Table~\ref{tab:equity_public}.}
+\label{tab:public_pedagogical}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Institution} & \textbf{Method} &
+\textbf{Bloom-BERT EVS} & \textbf{Bloom-LLM EVS} &
+\textbf{LLM-judge} \\
+\midrule
+\multirow{6}{*}{$\mathcal{I}_0$}
+  & Indiv          & -- & -- & -- \\
+  & FedKD          & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- \\
+\midrule
+\multirow{6}{*}{$\mathcal{I}_1$}
+  & Indiv          & -- & -- & -- \\
+  & FedKD          & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- \\
+\midrule
+\multirow{6}{*}{$\mathcal{I}_2$}
+  & Indiv          & -- & -- & -- \\
+  & FedKD          & -- & -- & -- \\
+  & B3 \red{[TBD]} & -- & -- & -- \\
+  & B4 \red{[TBD]} & -- & -- & -- \\
+  & B5 \red{[TBD]} & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
 \begin{table}[t]
 \centering
-\small
-\caption{Public testbed: pedagogical and LLM-judge
-metrics. Bloom-EVS is in $[0, 1]$; LLM-judge is the
-overall (mean across the four rubric dimensions),
-also in $[0, 1]$.}
-\label{tab:public_pedagogical}
-\begin{tabular}{llccc}
-\toprule
-\textbf{Institution} & \textbf{Paradigm} &
-\textbf{Bloom-BERT EVS} & \textbf{Bloom-LLM EVS} &
-\textbf{LLM-judge} \\
-\midrule
-$\mathcal{I}_0$ & Indiv     & -- & -- & -- \\
-                & \UniEdu{} & -- & -- & -- \\
-                & GPT-4o    & -- & -- & -- \\
-\midrule
-$\mathcal{I}_1$ & Indiv     & -- & -- & -- \\
-                & \UniEdu{} & -- & -- & -- \\
-                & GPT-4o    & -- & -- & -- \\
-\midrule
-$\mathcal{I}_2$ & Indiv     & -- & -- & -- \\
-                & \UniEdu{} & -- & -- & -- \\
-                & GPT-4o    & -- & -- & -- \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[t]
-\centering
-\small
-\caption{Public testbed: LLM-judge per-dimension
-breakdown for the \UniEdu{} federation, on a strict
-1--5 scale (higher is better).}
+\footnotesize
+\caption{LLM-judge per-dimension breakdown for
+\UniEdu{} (public testbed). Strict 1--5 scale.}
 \label{tab:public_llm_judge_dims}
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lcccc}
 \toprule
-\textbf{Institution} & \textbf{Context grnd.} &
-\textbf{Edu.\ value} & \textbf{Ans.\ correct.} &
-\textbf{Ans.\ relev.} \\
+& \textbf{Ctx.} & \textbf{Edu.} & \textbf{Corr.} &
+\textbf{Rel.} \\
 \midrule
 $\mathcal{I}_0$ & -- & -- & -- & -- \\
 $\mathcal{I}_1$ & -- & -- & -- & -- \\
@@ -1659,11 +1787,11 @@ $\mathcal{I}_2$ & -- & -- & -- & -- \\
 \begin{table}[t]
 \centering
 \small
-\caption{Public testbed: ablation. \UniEdu{}-static
-freezes the architecture-graph features at round~0;
-\UniEdu{}-noFiLM trains the GAT but does not feed its
-embeddings into the LM. Drop relative to full
-\UniEdu{} on the LLM-judge overall.}
+\caption{Ablation on the public testbed:
+\UniEdu{}-static freezes the architecture-graph
+features at round~0; \UniEdu{}-noFiLM trains the GAT
+but does not feed its embeddings into the LM. Drop
+relative to full \UniEdu{} on LLM-judge overall.}
 \label{tab:public_ablation}
 \begin{tabular}{lccc}
 \toprule
@@ -1676,80 +1804,28 @@ embeddings into the LM. Drop relative to full
 \end{tabular}
 \end{table}
 
-\subsection{Private Testbed}
-\label{sec:results_private}
-
-\red{TODO: fill in once Phase~2 finishes for all
-five private-testbed collaborators.}
-
-\begin{table*}[t]
-\centering
-\small
-\caption{Private testbed (\S\ref{sec:private_testbed}):
-five real institutions training on private curricula.
-Same column layout as Table~\ref{tab:public_quality}.}
-\label{tab:private_quality}
-\begin{tabular}{llccccccc}
-\toprule
-\textbf{Institution / SLM} & \textbf{Paradigm} &
-\textbf{ROUGE-L} & \textbf{BLEU-4} & \textbf{BERTScore} &
-\textbf{RTC} & \textbf{Faith.} & \textbf{QAFactEval} &
-\textbf{RQUGE} \\
-\midrule
-\multirow{3}{*}{$\mathcal{I}_0$ / BART-base}
-  & Indiv      & -- & -- & -- & -- & -- & -- & -- \\
-  & \UniEdu{}  & -- & -- & -- & -- & -- & -- & -- \\
-  & GPT-4o     & -- & -- & -- & -- & -- & -- & -- \\
-\midrule
-\multirow{3}{*}{$\mathcal{I}_1$ / Flan-T5-base}
-  & Indiv      & -- & -- & -- & -- & -- & -- & -- \\
-  & \UniEdu{}  & -- & -- & -- & -- & -- & -- & -- \\
-  & GPT-4o     & -- & -- & -- & -- & -- & -- & -- \\
-\midrule
-\multirow{3}{*}{$\mathcal{I}_2$ / LED-base-16384}
-  & Indiv      & -- & -- & -- & -- & -- & -- & -- \\
-  & \UniEdu{}  & -- & -- & -- & -- & -- & -- & -- \\
-  & GPT-4o     & -- & -- & -- & -- & -- & -- & -- \\
-\midrule
-\multirow{3}{*}{$\mathcal{I}_3$ / Pegasus-X-base}
-  & Indiv      & -- & -- & -- & -- & -- & -- & -- \\
-  & \UniEdu{}  & -- & -- & -- & -- & -- & -- & -- \\
-  & GPT-4o     & -- & -- & -- & -- & -- & -- & -- \\
-\midrule
-\multirow{3}{*}{$\mathcal{I}_4$ / ProphetNet-large}
-  & Indiv      & -- & -- & -- & -- & -- & -- & -- \\
-  & \UniEdu{}  & -- & -- & -- & -- & -- & -- & -- \\
-  & GPT-4o     & -- & -- & -- & -- & -- & -- & -- \\
-\midrule
-\multirow{3}{*}{Mean across $\mathcal{I}_{0..4}$}
-  & Indiv      & -- & -- & -- & -- & -- & -- & -- \\
-  & \UniEdu{}  & -- & -- & -- & -- & -- & -- & -- \\
-  & GPT-4o     & -- & -- & -- & -- & -- & -- & -- \\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-\subsection{Equity Analysis}
-\label{sec:results_equity}
+\subsection{Per-Institution Uplift and Knowledge Transfer}
+\label{sec:results_kti}
 
 \begin{table}[t]
 \centering
-\small
+\footnotesize
+\setlength{\tabcolsep}{4pt}
 \caption{Per-institution uplift $\Delta = Q^{(\uni)}
-- Q^{(\indiv)}$ on selected metrics (private
-testbed). A positive value indicates that the
-institution's SLM benefits from the federation.}
+- Q^{(\indiv)}$ on the private testbed. Positive =
+the institution's SLM benefits from federation.}
 \label{tab:uplift}
-\begin{tabular}{lccc}
+\begin{tabular}{lcccc}
 \toprule
-\textbf{Institution} & $\Delta\,$\textbf{ROUGE-L} &
-$\Delta\,$\textbf{LLM-judge} & $\Delta\,$\textbf{Bloom-EVS} \\
+\textbf{Inst.} & $\Delta\,$\textbf{R-L} &
+$\Delta\,$\textbf{LLM-J} & $\Delta\,$\textbf{Bloom} &
+$\Delta\,\bar{E}$ \\
 \midrule
-$\mathcal{I}_0$ (BART)        & -- & -- & -- \\
-$\mathcal{I}_1$ (Flan-T5)     & -- & -- & -- \\
-$\mathcal{I}_2$ (LED)         & -- & -- & -- \\
-$\mathcal{I}_3$ (Pegasus-X)   & -- & -- & -- \\
-$\mathcal{I}_4$ (ProphetNet)  & -- & -- & -- \\
+$\mathcal{I}_0$ (BART)        & -- & -- & -- & -- \\
+$\mathcal{I}_1$ (Flan-T5)     & -- & -- & -- & -- \\
+$\mathcal{I}_2$ (LED)         & -- & -- & -- & -- \\
+$\mathcal{I}_3$ (Pegasus-X)   & -- & -- & -- & -- \\
+$\mathcal{I}_4$ (ProphetNet)  & -- & -- & -- & -- \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1759,7 +1835,7 @@ $\mathcal{I}_4$ (ProphetNet)  & -- & -- & -- \\
 \small
 \caption{Knowledge Transfer Index $\mathrm{KTI}(l
 \leftarrow k)$ measured on
-$\mathcal{T}_{k\setminus l}$ (the held-out chunks
+$\mathcal{T}_{k\setminus l}$ (held-out chunks
 covering topics exclusive to institution $k$'s
 curriculum). \UniEdu{} cells should be
 \emph{positive}; \UniEdu{}-noFiLM cells should be
@@ -1767,8 +1843,8 @@ near zero (control).}
 \label{tab:kti}
 \begin{tabular}{llccc}
 \toprule
-\textbf{Direction $(l \leftarrow k)$} & \textbf{Paradigm} &
-\textbf{$Q_l^{\indiv}$} & \textbf{$Q_l^{\uni}$} &
+\textbf{Direction $(l \leftarrow k)$} & \textbf{Method} &
+$Q_l^{\indiv}$ & $Q_l^{\uni}$ &
 $\mathrm{KTI}$ \\
 \midrule
 $\mathcal{I}_0 \leftarrow \mathcal{I}_2$
@@ -1789,19 +1865,14 @@ $\mathcal{I}_2 \leftarrow \mathcal{I}_0$
 \subsection{Statistical Validation}
 \label{sec:results_stats}
 
-\red{TODO: paired Wilcoxon signed-rank test
-$(H_1: \mu_{\uni} > \mu_{\indiv})$ at
-$\alpha=0.05$ with Bonferroni correction across the
-(metric, institution) grid; Cohen's $d$ for effect
-size; $95\%$ bootstrap CIs ($B=10{,}000$).}
-
 \begin{table}[t]
 \centering
 \small
 \caption{Paired Wilcoxon signed-rank ($\indiv$ vs
-$\uni$, one-sided $H_1{:}\mu_{\uni} > \mu_{\indiv}$),
+$\uni$, one-sided $H_1{:}\mu_{\uni}>\mu_{\indiv}$),
 Cohen's $d$, and 95\% bootstrap CI on the per-sample
-LLM-judge overall, private testbed.}
+LLM-judge overall (private testbed). $p$-values
+Bonferroni-corrected across institutions.}
 \label{tab:wilcoxon}
 \begin{tabular}{lccc}
 \toprule
@@ -1817,14 +1888,58 @@ $\mathcal{I}_4$ & -- & -- & -- \\
 \end{tabular}
 \end{table}
 
+\subsection{H2 — LLM Approximation}
+\label{sec:results_llm_approx}
+
+We compare \emph{the federated mixture as a whole}
+against single-LLM baselines that received the same
+contexts zero-shot. The single number reported per
+metric for \UniEdu{} aggregates over institutions
+either by mean (text-overlap, NLI, faithfulness,
+LLM-judge) or by their mean Pairwise Equity Score
+$\bar{E}$. The LLM rows are produced by prompting
+each model once per test context with the same
+template, then scoring the resulting $(q, a)$ with
+the same evaluation suite (prompt in
+Appendix~\ref{app:llm_baselines}).
+
+\begin{table*}[t]
+\centering
+\small
+\caption{H2 (LLM approximation): the \UniEdu{}
+federated mixture compared against zero-shot
+single-LLM baselines on the public-testbed val set
+(mean over 3 folds). The federated mixture row is
+\UniEdu{} averaged across the institutions in the
+public testbed. Bold = best per metric.}
+\label{tab:llm_approx}
+\begin{tabular}{lccccccccc}
+\toprule
+\textbf{Method} &
+\textbf{ROUGE-L} & \textbf{BLEU-4} & \textbf{BERT-F1} &
+\textbf{RTC} & \textbf{Faith.} & \textbf{QAFactEval} &
+\textbf{RQUGE} & \textbf{Bloom-EVS} & \textbf{LLM-J} \\
+\midrule
+\UniEdu{} (federated mixture) & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+GPT-4o          & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+GPT-4o-mini     & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+Llama-3.1-8B-Inst   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+Qwen-2.5-7B-Inst    & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+Mistral-7B-Inst     & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+Gemini-1.5-Flash    & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
 \subsection{Qualitative Examples}
 \label{sec:results_qualitative}
 
 \red{TODO: one $(c, q^{\indiv}, q^{\uni},
-q^{\text{GPT-4o}})$ sample per institution, chosen to
-illustrate the federation's effect. Place the full set
-in Appendix~\ref{app:qualitative}; reproduce one or
-two illustrative examples in the body.}
+q^{\text{GPT-4o}})$ sample per institution, chosen
+to illustrate the federation's effect. Place the full
+set in Appendix~\ref{app:qualitative}; reproduce one
+or two illustrative examples in the body.}
 
 %% ════════════════════════════════════════════════════════════
 \section{Discussion}
@@ -2194,26 +2309,111 @@ qualitative failure modes.
 each as (context, indiv-QA, uni-QA, GPT-4o-QA) with
 a short comment.}
 
-\section{Equity-Metric Derivations}
+\section{Equity-Metric Derivations and Implementation}
 \label{app:equity_derivations}
 
-We provide derivations for the three equity metrics
-in \S\ref{sec:equity}: the \emph{Pairwise Equity
-Score} $E_{kl}^{(m)}$
+We provide derivations and implementation notes for
+the three equity metrics in \S\ref{sec:equity}: the
+\emph{Pairwise Equity Score} $E_{kl}^{(m)}$
 (Eq.~\ref{eq:pairwise_equity}), the
 \emph{Knowledge Transfer Index}
 $\mathrm{KTI}(l\leftarrow k)$ (Eq.~\ref{eq:kti}),
-and the \emph{Anchor Question Equity}
-score~(Eq.~\ref{eq:anchor_hypothesis}). For each, we
-state the assumptions, the operationalisation, and
-the failure mode when the assumption is violated
-(e.g., what KTI measures when
-$\mathcal{T}_{k\setminus l}$ is empty, or how
-$E_{kl}^{(m)}$ behaves when
-$|\mathcal{C}_k - \mathcal{C}_l| \to 0$).
+and the \emph{Anchor Question Equity} score
+(Eq.~\ref{eq:anchor_hypothesis}).
 
-\red{TODO: write derivations once metric values are
-populated.}
+\paragraph{Pairwise Equity Score (PES).}
+For paradigm $m \in \{\indiv, \fed, \uni\}$ and any
+two institutions $k, l$:
+\begin{equation*}
+  E_{kl}^{(m)} =
+  \frac{Q_k^{(m)} + Q_l^{(m)}}
+       {|\mathcal{C}_k - \mathcal{C}_l| +
+        |\mathcal{R}_k - \mathcal{R}_l| + \varepsilon}.
+\end{equation*}
+Inputs: $Q_k^{(m)}$ is institution $k$'s aggregate
+QA-quality score under paradigm $m$ (we use the
+LLM-judge overall by default; any of the metrics in
+Tables~\ref{tab:equity_public}--\ref{tab:equity_private}
+also work). $\mathcal{C}_k$ is curricular richness
+(Eq.~\ref{eq:richness}), normalised to $[0, 1]$
+across the federation. $\mathcal{R}_k$ is the
+trainable-parameter count of $k$'s SLM, normalised
+to $[0, 1]$ by dividing by the largest in the
+federation. $\varepsilon = 10^{-6}$.
+The mean PES reported as $\bar{E}$ in
+Tables~\ref{tab:equity_public}--\ref{tab:equity_private}
+is $\bar{E}_k^{(m)} = \frac{1}{m-1}\sum_{l \neq k}
+E_{kl}^{(m)}$, i.e., the mean over $k$'s pairs.
+
+\textbf{Reference implementation.}
+\texttt{compute\_pairwise\_equity} in
+\texttt{unifiedfl/evaluation/metrics.py} takes
+$(Q_k, Q_l, \mathcal{C}_k, \mathcal{C}_l,
+\mathcal{R}_k, \mathcal{R}_l, \varepsilon)$ and
+returns the scalar PES; the aggregate $\bar{E}$ is
+post-processed from the output of
+\texttt{experiments/04\_aggregate\_results.py} via a
+small helper script
+(\texttt{experiments/11\_compute\_equity.py},
+\red{TODO: implement}).
+
+\paragraph{Knowledge Transfer Index (KTI).}
+For a directed pair $(l \leftarrow k)$:
+\begin{equation*}
+  \mathrm{KTI}(l \leftarrow k) =
+  Q_l^{(\uni)}(\mathcal{T}_{k\setminus l}) -
+  Q_l^{(\indiv)}(\mathcal{T}_{k\setminus l}).
+\end{equation*}
+$\mathcal{T}_{k\setminus l}$ is constructed from
+the union of held-out chunks whose
+\texttt{question\_topic} field appears in $k$'s
+training data but not in $l$'s. A positive KTI shows
+that $l$'s federated SLM has gained quality on
+topics it never saw locally. The
+\UniEdu{}-noFiLM control should report KTI near
+zero, since the conditioning channel is what carries
+the cross-client signal.
+
+\paragraph{Anchor Question Equity.}
+For pairs $(k, l)$ satisfying $\mathcal{C}_k >
+\mathcal{C}_l$ and $\mathcal{R}_k = \mathcal{R}_l$
+(rare; we operationalise with bins on $\mathcal{R}$
+when no exact match exists), the LLM Equity Judge
+scores each model's response to a fixed anchor
+question $q^*$. The hypothesis is
+$s_l^{(\uni)} \approx s_k^{(\indiv)} > s_l^{(\indiv)}$:
+the federated low-resource client matches the
+high-resource individual, and beats the
+low-resource individual.
+
+\paragraph{Failure modes.}
+\begin{itemize}[leftmargin=1.5em, itemsep=2pt]
+  \item PES is undefined if both
+  $|\mathcal{C}_k - \mathcal{C}_l| \to 0$ and
+  $|\mathcal{R}_k - \mathcal{R}_l| \to 0$. The
+  $\varepsilon$ term keeps it finite but very large;
+  for nearly-matched pairs, we report $\bar{E}$ but
+  not the individual $E_{kl}$.
+  \item KTI requires $\mathcal{T}_{k\setminus l}$ to
+  be non-empty. If two institutions cover the same
+  topics, KTI is reported as ``--''.
+  \item Anchor Equity assumes there exists an anchor
+  question $q^*$ over a concept covered by both $k$
+  and $l$. We list the anchor questions used in
+  Table~\red{[TODO]}.
+\end{itemize}
+
+\section{FedKD Re-implementation Details}
+\label{app:fedkd_implementation}
+
+\red{TODO: describe how FedKD~\citep{wu2022fedkd}
+was re-implemented for our SLM-AQAG setting:
+(i)~mentor/mentee pair per client, both seeded from
+the institution's local SLM checkpoint;
+(ii)~local distillation loss (KL on next-token
+distributions);
+(iii)~mentee-only parameter exchange via FedAvg;
+(iv)~hyperparameter table.}
 
 \end{document}
 
