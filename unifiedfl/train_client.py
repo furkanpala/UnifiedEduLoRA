@@ -329,13 +329,15 @@ def _fast_rouge_l(
             truncation=True, padding=False, return_tensors="pt",
         ).to(device)
         with torch.amp.autocast("cuda", enabled=use_amp, dtype=torch.bfloat16):
+            # Greedy decoding (num_beams=1) — early_stopping is omitted on
+            # purpose because it only applies to beam search and emits a
+            # noisy UserWarning when set with num_beams=1.
             out_ids = client_model.generate(
                 input_ids=enc["input_ids"],
                 attention_mask=enc["attention_mask"],
                 num_beams=1,
                 max_new_tokens=args.max_target_len,
                 no_repeat_ngram_size=3,
-                early_stopping=True,
             )
         gen = tokenizer.decode(out_ids[0], skip_special_tokens=True)
         ref = f"Question: {sample['question']}\nAnswer: {sample['answer']}"
