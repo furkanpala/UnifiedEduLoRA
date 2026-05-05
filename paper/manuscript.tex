@@ -1233,23 +1233,50 @@ the same val set:
   adapter on its own data, with no federation. Three
   conditioning regimes per institution
   (\S\ref{sec:conditioning}).
-  \item
-  \textbf{FedKD}~\citep{wu2022fedkd}.
+  \item \textbf{FedKD}~\citep{wu2022fedkd}.
   Communication-efficient federated learning via
   knowledge distillation: each client trains a small
   ``mentee'' model that distils both the local
   ``mentor'' and the federated ensemble; only mentee
-  parameters are exchanged. Re-implemented for our
-  AQAG-on-SLM setting; details in
-  Appendix~\ref{app:fedkd_implementation}.
-  \red{TODO: implement FedKD in unifiedfl/.}
-  \item \textbf{Benchmark B3.} \red{TODO: confirm with
-  Furkan which heterogeneous-FL or personalised-FL
-  baseline to include here (candidates: HeteroFL,
-  InclusiveFL, FedRep, pFedHN). Insert citation and
-  one-line description.}
-  \item \textbf{Benchmark B4.} \red{TODO: TBD.}
-  \item \textbf{Benchmark B5.} \red{TODO: TBD.}
+  parameters are exchanged. \red{TODO: implement
+  FedKD in \texttt{unifiedfl/}.}
+  \item \textbf{FedMD}~\citep{li2019fedmd}. The
+  canonical heterogeneous-federated-learning
+  baseline. Each client trains its own SLM locally,
+  then communicates predictions on a shared
+  public dataset; the server aggregates predictions
+  into a consensus, and clients distil that consensus
+  back into their local SLM. Architectural
+  heterogeneity is handled by-design because clients
+  exchange logits rather than parameters. We use the
+  public-testbed chunks (\S\ref{sec:public_testbed})
+  as the shared dataset. \red{TODO: implement FedMD
+  in \texttt{unifiedfl/}.}
+  \item \textbf{FedDF}~\citep{lin2020feddf}.
+  Server-side ensemble distillation on an unlabelled
+  public dataset; no parameter averaging. Like
+  FedMD, accommodates heterogeneous SLMs through
+  output-space rather than parameter-space exchange,
+  but moves the distillation step to the server.
+  Re-uses the same public dataset as FedMD.
+  \red{TODO: implement FedDF in \texttt{unifiedfl/}.}
+  \item \textbf{FedET}~\citep{cheng2022fedet}.
+  Communicates per-client embeddings rather than
+  logits: each client uploads its hidden-state
+  representations on the shared public dataset, the
+  server fuses them via a small enhanced-transformer
+  aggregator, and clients distil the fused
+  representation back into their local SLM. Closer
+  in spirit to \UniEdu{}'s embedding-channel design
+  than FedMD/FedDF's logit channel. \red{TODO:
+  implement FedET in \texttt{unifiedfl/}.}
+
+\smallskip
+Implementation details for all four
+distillation-based baselines (mentor/mentee setup,
+distillation losses, hyperparameters,
+public-dataset usage) are in
+Appendix~\ref{app:baseline_implementations}.
   \item \textbf{\UniEdu{}-static} (ablation):
   architecture-graph features fixed at round~0, no
   per-batch refresh of effective-weight statistics.
@@ -1625,33 +1652,33 @@ Table~\ref{tab:llm_approx}. Bold = best per
 \multirow{6}{*}{$\mathcal{I}_0$ (BART, MIT)}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
 \multirow{6}{*}{$\mathcal{I}_1$ (Flan-T5, Stanford)}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
 \multirow{6}{*}{$\mathcal{I}_2$ (LED, ML papers)}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
 \multirow{6}{*}{Mean across $\mathcal{I}_{0,1,2}$}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \bottomrule
 \end{tabular}
@@ -1675,49 +1702,49 @@ institutions instead of three.}
 \multirow{6}{*}{$\mathcal{I}_0$ / BART-base}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
 \multirow{6}{*}{$\mathcal{I}_1$ / Flan-T5-base}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
 \multirow{6}{*}{$\mathcal{I}_2$ / LED-base-16384}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
 \multirow{6}{*}{$\mathcal{I}_3$ / Pegasus-X-base}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
 \multirow{6}{*}{$\mathcal{I}_4$ / ProphetNet-large}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
 \multirow{6}{*}{Mean across $\mathcal{I}_{0..4}$}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \bottomrule
 \end{tabular}
@@ -1741,25 +1768,25 @@ Same set of methods as Table~\ref{tab:equity_public}.}
 \multirow{6}{*}{$\mathcal{I}_0$}
   & Indiv          & -- & -- & -- \\
   & FedKD          & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- \\
+  & FedMD          & -- & -- & -- \\
+  & FedDF          & -- & -- & -- \\
+  & FedET          & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- \\
 \midrule
 \multirow{6}{*}{$\mathcal{I}_1$}
   & Indiv          & -- & -- & -- \\
   & FedKD          & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- \\
+  & FedMD          & -- & -- & -- \\
+  & FedDF          & -- & -- & -- \\
+  & FedET          & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- \\
 \midrule
 \multirow{6}{*}{$\mathcal{I}_2$}
   & Indiv          & -- & -- & -- \\
   & FedKD          & -- & -- & -- \\
-  & B3 \red{[TBD]} & -- & -- & -- \\
-  & B4 \red{[TBD]} & -- & -- & -- \\
-  & B5 \red{[TBD]} & -- & -- & -- \\
+  & FedMD          & -- & -- & -- \\
+  & FedDF          & -- & -- & -- \\
+  & FedET          & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- \\
 \bottomrule
 \end{tabular}
@@ -1920,7 +1947,7 @@ public testbed. Bold = best per metric.}
 \textbf{RTC} & \textbf{Faith.} & \textbf{QAFactEval} &
 \textbf{RQUGE} & \textbf{Bloom-EVS} & \textbf{LLM-J} \\
 \midrule
-\UniEdu{} (federated mixture) & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+00122\UniEdu{} & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
 GPT-4o          & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 GPT-4o-mini     & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
@@ -2403,17 +2430,73 @@ low-resource individual.
   Table~\red{[TODO]}.
 \end{itemize}
 
-\section{FedKD Re-implementation Details}
-\label{app:fedkd_implementation}
+\section{Distillation-Based Baseline Implementations}
+\label{app:baseline_implementations}
 
-\red{TODO: describe how FedKD~\citep{wu2022fedkd}
-was re-implemented for our SLM-AQAG setting:
-(i)~mentor/mentee pair per client, both seeded from
-the institution's local SLM checkpoint;
-(ii)~local distillation loss (KL on next-token
-distributions);
+We re-implement the four distillation-based H1
+baselines (FedKD, FedMD, FedDF, FedET) inside the
+same \texttt{unifiedfl/} codebase used for
+\UniEdu{}, so they share tokenisation, splitting,
+and evaluation. Across all four, each client's
+SLM is the same as in \UniEdu{}: a frozen backbone
+with a trainable LoRA adapter on the attention
+projections.
+
+\paragraph{Shared public dataset.}
+FedMD, FedDF, and FedET require an unlabelled
+public dataset for their distillation step. We use
+the public-testbed chunks
+(\S\ref{sec:public_testbed}) as that dataset: each
+client computes its outputs (logits or hidden
+states, depending on the method) on these chunks
+and exchanges only those, never raw curricular
+text. The public testbed thus serves a dual role
+--- as one of our experimental settings, and as the
+public-distillation surface for the other three
+baselines.
+
+\paragraph{FedKD~\citep{wu2022fedkd}.}
+\red{TODO}: (i)~mentor/mentee pair per client,
+both seeded from the institution's local SLM
+checkpoint; (ii)~local distillation loss (KL on
+next-token distributions between mentor and mentee);
 (iii)~mentee-only parameter exchange via FedAvg;
-(iv)~hyperparameter table.}
+(iv)~hyperparameter table.
+
+\paragraph{FedMD~\citep{li2019fedmd}.}
+\red{TODO}: (i)~each client trains its local SLM
+on its private curriculum; (ii)~all clients
+generate logits (or top-$k$ next-token
+distributions) on the shared public dataset;
+(iii)~server averages logits per public-dataset
+example to form the consensus distribution;
+(iv)~each client distils the consensus into its
+local SLM by adding a KL term on those examples;
+(v)~hyperparameter table.
+
+\paragraph{FedDF~\citep{lin2020feddf}.}
+\red{TODO}: (i)~each client uploads logits on the
+shared public dataset; (ii)~the server runs
+ensemble distillation by training a small server-
+side model on the averaged ensemble outputs;
+(iii)~the server-side model's logits are
+re-distilled back to each client; (iv)~no
+client-side parameter averaging anywhere in the
+pipeline; (v)~hyperparameter table.
+
+\paragraph{FedET~\citep{cheng2022fedet}.}
+\red{TODO}: (i)~each client extracts hidden-state
+representations on the shared public dataset from
+a chosen layer of its SLM; (ii)~server fuses
+representations through a small enhanced-transformer
+aggregator; (iii)~fused representations are
+distilled back into each client's local SLM via a
+representation-matching loss; (iv)~hyperparameter
+table.
+
+\paragraph{Implementation footprint.}
+\red{TODO} insert wall-clock and OpenAI-API cost
+deltas for each baseline relative to \UniEdu{}.
 
 \end{document}
 
