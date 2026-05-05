@@ -25,11 +25,11 @@ Two converter scripts are provided in `unifiedfl/data/` as starting points. **Th
 ```bash
 pip install pymupdf
 
-# Inspect first, then run:
-python data/pdf_to_chunks.py lecture.pdf
+# Inspect first, then run (paths are from the repo root):
+python unifiedfl/data/pdf_to_chunks.py lecture.pdf
 
 # Skip cover page, references, and appendix (0-based page indices):
-python data/pdf_to_chunks.py lecture.pdf --skip-pages 0 1 42 43 44
+python unifiedfl/data/pdf_to_chunks.py lecture.pdf --skip-pages 0 1 42 43 44
 
 # Output: lecture_chunks.json  — a JSON array of plain-text strings
 ```
@@ -46,13 +46,13 @@ Key things to adjust inside the script:
 pip install python-pptx
 
 # First, see which slide layouts exist in your file:
-python data/pptx_to_chunks.py lecture.pptx --list-layouts
+python unifiedfl/data/pptx_to_chunks.py lecture.pptx --list-layouts
 
 # Then run (title slides and section headers are skipped by default):
-python data/pptx_to_chunks.py lecture.pptx
+python unifiedfl/data/pptx_to_chunks.py lecture.pptx
 
 # If your slides have speaker notes with the real explanation, include them:
-python data/pptx_to_chunks.py lecture.pptx --include-notes
+python unifiedfl/data/pptx_to_chunks.py lecture.pptx --include-notes
 
 # Output: lecture_chunks.json  — a JSON array of plain-text strings
 ```
@@ -146,19 +146,47 @@ print(f"Saved {len(entries)} entries.")
 Before splitting, run the validator to confirm your file is correctly formatted:
 
 ```bash
-python validate.py client0_data.json
+python unifiedfl/validate.py client0_data.json
 ```
 
-The validator checks:
+**Strict mode (default)** — for files produced by `generate_qa.py`. Checks:
 - All required fields are present and non-empty
 - `clean_context` is within the word-count range
 - `bloom_level` is an integer between 1 and 6
 - `difficulty` is one of `easy`, `medium`, `hard`
 - `answerable_from_context` is `true` for every pair
 
-It also prints a summary of entry counts, total QA pairs, Bloom level distribution, and difficulty distribution.
+**Lenient mode (`--lenient`)** — for machine-enhanced data prepared outside Phase 1 (e.g. files lacking `entry_id`, `bloom_justification`, or saved as concatenated/streaming JSON):
+
+```bash
+python unifiedfl/validate.py --lenient my_enhanced_data.json
+```
+
+Lenient mode accepts non-array JSON formats and only validates the fields the training code actually consumes (`clean_context`, `qa_pairs`, `question`, `answer`, `question_topic`, `bloom_level`).
+
+Both modes print a summary of entry counts, total QA pairs, Bloom level distribution, and difficulty distribution.
 
 **Fix any reported errors before proceeding to Step 4.**
+
+---
+
+### Step 3.5 — (optional, federated experiments) Report data statistics (`data_stats.py`)
+
+If you're contributing to a federated experiment that uses `split.py --balance`, the coordinator needs to know the smallest entry count across all clients (that's the cap). Each participant runs `data_stats.py` on their own file and reports back the entry count — no raw data leaves their machine.
+
+```bash
+# What each participant runs
+python unifiedfl/data_stats.py my_data.json
+
+# What the coordinator runs across all collected files
+python unifiedfl/data_stats.py \
+    --client 0:client0_data.json \
+    --client 1:client1_data.json \
+    --client 2:client2_data.json \
+    --save cross_client_stats.json
+```
+
+The cross-client output highlights the minimum entry count and the recommended `--balance` cap for `split.py`.
 
 ---
 
@@ -167,7 +195,7 @@ It also prints a summary of entry counts, total QA pairs, Bloom level distributi
 Once the file passes validation, generate the train/val/test splits. **All collaborators must use `--seed 42`** — this is the anchor that makes all three experiments (individual, FedKD, UnifiedEdu) directly comparable.
 
 ```bash
-python split.py \
+python unifiedfl/split.py \
     --client 0:client0_data.json \
     --seed   42 \
     --output-dir outputs/
@@ -176,12 +204,26 @@ python split.py \
 For multiple clients on the same machine:
 
 ```bash
-python split.py \
+python unifiedfl/split.py \
     --client 0:client0_data.json \
     --client 1:client1_data.json \
     --seed   42 \
     --output-dir outputs/
 ```
+
+**For balanced cross-client comparisons** (federated experiments where you want the GNN's effect isolated from data-quantity differences), add `--balance`:
+
+```bash
+python unifiedfl/split.py \
+    --client 0:client0_data.json \
+    --client 1:client1_data.json \
+    --client 2:client2_data.json \
+    --seed   42 \
+    --balance \
+    --output-dir outputs/
+```
+
+`--balance` caps every client at the smallest client's entry count (after a deterministic per-client shuffle) so all three end up with comparable train/val/test sizes. Without the flag, each client uses all its own entries — the realistic heterogeneous setting needed for the equity story.
 
 #### Split protocol
 
@@ -234,8 +276,6 @@ Send `outputs/splits/checksums.txt` to the project coordinator. This file contai
 e9ed4f86717a9e56d0b4866dd13800d9  client_0_fold1_train.json
 ...
 ```
-
----
 
 ---
 
@@ -297,7 +337,7 @@ Upload your Phase 1 splits to Drive, e.g.:
   client_<N>_fold{1,2,3}_val.json
 ```
 
-The test set is **not used in Phase 2**
+The test set is **not used in Phase 2** — it stays held out for the federated comparison in Phase 3.
 
 ---
 
@@ -345,17 +385,18 @@ You can also run a single conditioning + fold at a time. The output path now emb
 
 ```bash
 python unifiedfl/train_client.py \
-    --client-id    <your_client_id> \
-    --fold         1 \
-    --conditioning baseline \
-    --model        facebook/bart-base \
-    --family       bart \
-    --targets      q_proj v_proj \
-    --splits-dir   /content/drive/MyDrive/unifiedfl/outputs/splits \
-    --output-dir   /content/drive/MyDrive/unifiedfl/outputs \
-    --num-epochs   60 \
-    --patience     10
+    --client-id      <your_client_id> \
+    --fold           1 \
+    --conditioning   baseline \
+    --model          facebook/bart-base \
+    --family         bart \
+    --targets        q_proj v_proj \
+    --splits-dir     /content/drive/MyDrive/unifiedfl/outputs/splits \
+    --output-dir     /content/drive/MyDrive/unifiedfl/outputs \
+    --openai-api-key sk-...
 ```
+
+**Note:** unlike the orchestrator, `train_client.py` does **not** auto-load the `openai_api_key` file from the repo root. To enable comprehensive evaluation when calling it directly, pass `--openai-api-key sk-...` explicitly (or set the `OPENAI_API_KEY` env var and point the flag at it). Without an API key, only the local-model metrics run.
 
 #### Key hyperparameters
 
@@ -377,7 +418,7 @@ python unifiedfl/train_client.py \
 | `--lora-dropout` | 0.1 | LoRA dropout |
 | `--checkpoint-every` | 5 | Save a checkpoint every N epochs |
 | `--no-heavy` | off | Skip heavy metrics (UnifiedQA + DeBERTa) in final evaluation |
-| `--openai-api-key` | auto-loaded from `openai_api_key` file | Enables Answer Relevancy, Bloom's LLM judge, and GPT-4o QA judge |
+| `--openai-api-key` | none — must be passed explicitly when calling `train_client.py` directly (the orchestrator auto-loads from the `openai_api_key` file) | Enables Answer Relevancy, Bloom's LLM judge, and GPT-4o QA judge |
 
 ---
 
@@ -468,16 +509,35 @@ For mid-fold resume, `train_client.py` directly supports `--resume-from-epoch N`
 
 ```
 unifiedfl/
-├── generate_qa.py       ← Step 2: generate QA pairs from plain-text chunks
-├── validate.py          ← Step 3: validate your client data file
-├── split.py             ← Step 4: create train/val/test splits
-├── train_client.py      ← Experiment 1: individual LoRA training (baseline)
-├── train_federated.py   ← Experiment 3: UnifiedEdu federated training
-├── config/              ← model and training hyperparameters
-├── data/                ← dataset classes and preprocessing utilities
-├── models/              ← GNN, FiLM adapter, client model wrappers
-├── federation/          ← federated server and client logic
-├── training/            ← training loop and checkpointing
-├── evaluation/          ← metrics and evaluator
-└── utils/               ← logging utilities
+├── generate_qa.py            ← Step 2: generate QA pairs from plain-text chunks
+├── validate.py               ← Step 3: validate your client data file (--lenient mode for non-Phase-1 data)
+├── data_stats.py             ← Step 3.5: report per-client / cross-client data statistics
+├── split.py                  ← Step 4: create train/val/test splits (--balance for federated experiments)
+├── train_client.py           ← Experiment 1: individual LoRA training (baseline)
+├── train_federated.py        ← Experiment 3: UnifiedEdu federated training
+├── eval_diverse_decoding.py  ← re-evaluate saved checkpoints with diverse beam search
+├── visualize_graph.py        ← architecture-graph visualizer (debugging the GNN input)
+├── config/                   ← model and training hyperparameters
+├── data/                     ← dataset classes and preprocessing utilities
+│   ├── pdf_to_chunks.py      ← Step 1 helper: PDF → plain-text chunks
+│   └── pptx_to_chunks.py     ← Step 1 helper: PowerPoint → plain-text chunks
+├── models/                   ← GNN, FiLM adapter, client model wrappers
+├── federation/               ← federated server and client logic
+├── training/                 ← training loop and checkpointing
+├── evaluation/               ← metrics and evaluator
+└── utils/                    ← logging utilities
+
+experiments/                  ← experiment orchestrators (sit on top of train_client.py / train_federated.py)
+├── 01_enhance_mit_data.py             ← GPT-4o-mini enhances raw MIT data with question_topic + bloom_level
+├── 02_split_3fold.py                  ← per-client 3-fold CV split (single-dataset MIT experiment)
+├── 03_run_three_conditionings.py      ← Phase 2 orchestrator: 3 conditionings × 3 folds = 9 trainings
+├── 04_aggregate_results.py            ← per-client summary table (best or final checkpoint)
+├── 05_enhance_all_datasets.py         ← enhances MIT, Stanford, Papers in one pass
+├── 06_split_fed_experiment.py         ← single-split (80/10/10) for the 3-client federated experiment
+├── 07_run_individual_baselines_fed_exp.py  ← individual baselines for the federated comparison
+├── 08_run_federated_training.py       ← train_federated.py wrapper with the federated-experiment defaults
+├── 09_compare_results.py              ← individual-vs-federated comparison table
+└── 10_eval_checkpoint.py              ← evaluate any federated checkpoint and save metrics for comparison
+
+infer.py                      ← student-facing inference: load a saved checkpoint, generate QA from a context
 ```
