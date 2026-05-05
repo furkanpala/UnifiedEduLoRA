@@ -84,6 +84,48 @@ def _cosine(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.dot(a, b) / (na * nb))
 
 
+# Hex-digit set used by _sanitize_json_escapes
+_JSON_HEX = set("0123456789abcdefABCDEF")
+
+
+def _sanitize_json_escapes(s: str) -> str:
+    """
+    Make every backslash in `s` part of a valid JSON escape sequence.
+
+    GPT models occasionally emit responses containing raw backslashes (math
+    notation like ``\\alpha``, paths like ``C:\\new``, etc.) that are not
+    valid JSON escape sequences. ``json.loads`` then crashes with
+    ``Invalid \\escape``.
+
+    Walks the string left-to-right; when a backslash isn't followed by one
+    of the JSON-recognised escape characters (``"\\/bfnrt`` or
+    ``uXXXX``), it doubles the backslash. Existing valid escapes
+    (including ``\\\\``, ``\\n``, ``\\uXXXX``) are left untouched — which a
+    simple regex cannot guarantee, since regex matching is character-local
+    and can re-match the second half of a valid ``\\\\`` pair.
+    """
+    out = []
+    i = 0
+    n = len(s)
+    while i < n:
+        if s[i] == '\\':
+            if i + 1 < n and s[i + 1] in '"\\/bfnrt':
+                out.append(s[i:i + 2])
+                i += 2
+                continue
+            if (i + 5 < n and s[i + 1] == 'u'
+                    and all(c in _JSON_HEX for c in s[i + 2:i + 6])):
+                out.append(s[i:i + 6])
+                i += 6
+                continue
+            out.append('\\\\')
+            i += 1
+            continue
+        out.append(s[i])
+        i += 1
+    return ''.join(out)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Section 1 — Lightweight reference-based
 # ─────────────────────────────────────────────────────────────────────────────
@@ -238,7 +280,7 @@ def compute_faithfulness(
                 raw = re.sub(r"\s*```$", "", raw)
                 # Escape lone backslashes (e.g. \alpha, \lambda from math notation)
                 # that are not valid JSON escape sequences.
-                raw = re.sub(r'\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})', r'\\\\', raw)
+                raw = _sanitize_json_escapes(raw)
                 return json.loads(raw).get("claims", sent_tokenize(answer))
             except Exception as e:
                 logger.warning(f"LLM claim decomposition failed, falling back to sent_tokenize: {e}")
@@ -404,7 +446,7 @@ def compute_answer_relevancy(
             raw = resp.choices[0].message.content.strip()
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)
-            raw = re.sub(r'\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})', r'\\\\', raw)
+            raw = _sanitize_json_escapes(raw)
             return json.loads(raw).get("questions", [])
         except Exception as e:
             logger.warning(f"Reverse-question generation failed: {e}")
@@ -577,7 +619,7 @@ def compute_blooms_llm(
             raw = resp.choices[0].message.content.strip()
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)
-            raw = re.sub(r'\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})', r'\\\\', raw)
+            raw = _sanitize_json_escapes(raw)
             parsed = json.loads(raw)
             level  = int(parsed["level"])
             reason = parsed.get("reason", "")
