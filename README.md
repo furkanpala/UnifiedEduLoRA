@@ -211,19 +211,15 @@ python unifiedfl/split.py \
     --output-dir outputs/
 ```
 
-**For balanced cross-client comparisons** (federated experiments where you want the GNN's effect isolated from data-quantity differences), add `--balance`:
-
-```bash
-python unifiedfl/split.py \
-    --client 0:client0_data.json \
-    --client 1:client1_data.json \
-    --client 2:client2_data.json \
-    --seed   42 \
-    --balance \
-    --output-dir outputs/
-```
-
-`--balance` caps every client at the smallest client's entry count (after a deterministic per-client shuffle) so all three end up with comparable train/val/test sizes. Without the flag, each client uses all its own entries — the realistic heterogeneous setting needed for the equity story.
+> **Note for individual participants (Phase 2 collaborators):** the basic
+> command above is all you need. You only have your own data, so you can't
+> meaningfully balance against anyone else.
+>
+> A `--balance` flag exists in `split.py` for the federated comparison
+> (Phase 3): when one machine has *all* clients' data files, the coordinator
+> can pass `--balance` to cap every client at the smallest client's entry
+> count, isolating the GNN's effect from differences in data quantity.
+> It's a coordinator-only feature and irrelevant to Phase 2.
 
 #### Split protocol
 
