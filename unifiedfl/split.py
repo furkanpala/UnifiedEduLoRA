@@ -183,6 +183,12 @@ def parse_args() -> argparse.Namespace:
         "--test-ratio", type=float, default=0.15,
         help="Fraction of entries held out as fixed test set (default: 0.15)",
     )
+    p.add_argument(
+        "--balance", action="store_true",
+        help="Cap every client at the smallest client's entry count (after a "
+             "seeded shuffle) for a fair across-client comparison. Without "
+             "this flag, each client keeps all its own entries.",
+    )
     return p.parse_args()
 
 
@@ -211,10 +217,31 @@ def main() -> None:
     print(f"\nSeed: {args.seed} | Folds: {args.n_folds} | Test ratio: {args.test_ratio}")
     print("=" * 60)
 
+    # First pass: load every client's data so we can decide whether to balance.
+    loaded: List[Tuple[int, Path, List[Dict[str, Any]]]] = []
     for cid, data_path in client_cfgs:
-        print(f"\nClient {cid} — {data_path}")
         data = _load(data_path)
-        print(f"  Loaded {len(data)} entries")
+        loaded.append((cid, data_path, data))
+
+    if args.balance:
+        cap = min(len(data) for _, _, data in loaded)
+        print(f"\n[balance] Capping every client at {cap} entries "
+              f"(smallest dataset).")
+    else:
+        cap = None
+
+    for cid, data_path, data in loaded:
+        print(f"\nClient {cid} — {data_path}")
+        n_full = len(data)
+
+        if cap is not None and n_full > cap:
+            cap_rng = random.Random(args.seed + cid)
+            shuffled = list(range(n_full))
+            cap_rng.shuffle(shuffled)
+            data = [data[i] for i in shuffled[:cap]]
+            print(f"  Loaded {n_full} entries; capped to {len(data)}")
+        else:
+            print(f"  Loaded {len(data)} entries")
 
         result = make_splits(
             data,
@@ -230,7 +257,7 @@ def main() -> None:
             encoding="utf-8",
         )
         checksum_lines.append(f"{_md5(test_path)}  {test_path.name}")
-        print(f"  Test  : {len(result['test_samples']):>5} QA pairs → {test_path.name}")
+        print(f"  Test  : {len(result['test_samples']):>5} QA pairs ->{test_path.name}")
 
         # Save per-fold train/val
         for fold_k, splits in result["fold_splits"].items():
@@ -241,7 +268,7 @@ def main() -> None:
                     encoding="utf-8",
                 )
                 checksum_lines.append(f"{_md5(out_path)}  {out_path.name}")
-                print(f"  Fold {fold_k} {split_name:<5}: {len(samples):>5} QA pairs → {out_path.name}")
+                print(f"  Fold {fold_k} {split_name:<5}: {len(samples):>5} QA pairs ->{out_path.name}")
 
     # Write checksum file
     checksum_path = splits_dir / "checksums.txt"
