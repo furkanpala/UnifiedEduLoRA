@@ -37,29 +37,36 @@ def parse_args() -> argparse.Namespace:
                    help="Root output dir from step 7 (individual training).")
     p.add_argument("--fed-dir",   required=True,
                    help="Root output dir from step 8 (federated training).")
+    p.add_argument("--indiv-checkpoint", choices=["best", "final"], default="best",
+                   help="Which individual-baseline checkpoint to load (default: best).")
     p.add_argument("--save",      default=None,
                    help="Optional path to save the comparison as JSON.")
     return p.parse_args()
 
 
-def load_indiv(indiv_dir: Path, cid: int) -> dict[str, dict]:
+def load_indiv(indiv_dir: Path, cid: int, checkpoint: str = "best") -> dict[str, dict]:
+    """
+    Load individual baseline metrics from either the new layout
+    (results/{best,final}/metrics_*.json) or the legacy flat layout.
+    """
     base = indiv_dir / "topic" / f"client_{cid}" / "fold1"
     result = {}
 
-    local_path = base / "metrics_val.json"
-    if local_path.exists():
-        result["local"] = json.loads(local_path.read_text())
-    else:
-        print(f"  [warn] missing: {local_path}")
-        result["local"] = None
+    def _load_first(*candidates: Path):
+        for p in candidates:
+            if p.exists():
+                return json.loads(p.read_text())
+        print(f"  [warn] missing: tried {[str(p) for p in candidates]}")
+        return None
 
-    global_path = base / "metrics_global_test.json"
-    if global_path.exists():
-        result["global"] = json.loads(global_path.read_text())
-    else:
-        print(f"  [warn] missing: {global_path}")
-        result["global"] = None
-
+    result["local"] = _load_first(
+        base / "results" / checkpoint / "metrics_val.json",
+        base / "metrics_val.json",  # legacy
+    )
+    result["global"] = _load_first(
+        base / "results" / checkpoint / "metrics_global_test.json",
+        base / "metrics_global_test.json",  # legacy
+    )
     return result
 
 
@@ -117,7 +124,7 @@ def main() -> None:
 
     for cid in [0, 1, 2]:
         name = CLIENT_NAMES[cid]
-        indiv = load_indiv(indiv_dir, cid)
+        indiv = load_indiv(indiv_dir, cid, checkpoint=args.indiv_checkpoint)
         fed   = fed_data.get(str(cid), {})
 
         comparison[cid] = {"name": name, "individual": indiv, "federated": fed}

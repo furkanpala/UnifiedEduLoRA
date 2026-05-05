@@ -31,17 +31,27 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--conditionings", nargs="+",
                    default=["baseline", "topic", "bloom"])
     p.add_argument("--folds",         nargs="+", type=int, default=[1, 2, 3])
+    p.add_argument("--checkpoint",   choices=["best", "final"], default="best",
+                   help="Which evaluated checkpoint to aggregate (default: best).")
     p.add_argument("--save-summary", default=None,
                    help="Optional path to write per-fold metrics as JSON")
     return p.parse_args()
 
 
-def load_metrics(out_dir: Path, conditioning: str, client_id: int, fold: int) -> dict | None:
-    path = (out_dir / conditioning / f"client_{client_id}" / f"fold{fold}"
-            / "metrics_val.json")
-    if not path.exists():
-        return None
-    return json.loads(path.read_text())
+def load_metrics(out_dir: Path, conditioning: str, client_id: int, fold: int,
+                 checkpoint: str) -> dict | None:
+    fold_dir = out_dir / conditioning / f"client_{client_id}" / f"fold{fold}"
+    # New layout: results/{best,final}/metrics_val.json
+    new_path = fold_dir / "results" / checkpoint / "metrics_val.json"
+    if new_path.exists():
+        return json.loads(new_path.read_text())
+    # Backward compat: old layout had metrics_val.json at the fold root
+    # (corresponds to the "best" checkpoint metrics).
+    if checkpoint == "best":
+        old_path = fold_dir / "metrics_val.json"
+        if old_path.exists():
+            return json.loads(old_path.read_text())
+    return None
 
 
 def fmt(v) -> str:
@@ -54,10 +64,12 @@ def main() -> None:
     args = parse_args()
     out_dir = Path(args.output_dir)
 
+    print(f"Aggregating {args.checkpoint!r} checkpoint metrics for client {args.client_id}.\n")
+
     rows: list[dict] = []
     for cond in args.conditionings:
         for fold in args.folds:
-            m = load_metrics(out_dir, cond, args.client_id, fold)
+            m = load_metrics(out_dir, cond, args.client_id, fold, args.checkpoint)
             if m is None:
                 continue
             rows.append({

@@ -108,7 +108,7 @@ def _annotate_entry(
         f"  1. question_topic — a 2-4 word noun phrase naming the specific ML concept tested "
         f"(e.g. \"learning rate scheduling\", \"kernel trick\").\n"
         f"  2. bloom_level — integer 1-6 (1=Remember, 2=Understand, 3=Apply, "
-        f"4=Analyse, 5=Evaluate, 6=Create).\n\n"
+        f"4=Analyze, 5=Evaluate, 6=Create).\n\n"
         f"Context:\n\"\"\"{ctx[:1200]}\"\"\"\n\n"
         f"QA pairs:\n{qa_lines}\n\n"
         f"Return ONLY valid JSON — no markdown, no commentary:\n"

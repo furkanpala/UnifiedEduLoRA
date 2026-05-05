@@ -122,7 +122,7 @@ print(f"Saved {len(entries)} entries.")
   {
     "entry_id":           "client0_0000",
     "source_description": "Intro to ML — Lecture 3",
-    "clean_context":      "Gradient descent is an optimisation algorithm ...",
+    "clean_context":      "Gradient descent is an optimization algorithm ...",
     "context_topics":     ["Gradient Descent", "Learning Rate", "Convergence"],
     "qa_pairs": [
       {
@@ -130,7 +130,7 @@ print(f"Saved {len(entries)} entries.")
         "answer":                "The learning rate controls the step size taken at each iteration ...",
         "question_topic":        "Learning Rate Sensitivity",
         "bloom_level":           2,
-        "bloom_justification":   "Requires understanding how a parameter affects algorithm behaviour.",
+        "bloom_justification":   "Requires understanding how a parameter affects algorithm behavior.",
         "difficulty":            "easy",
         "answerable_from_context": true
       }
@@ -212,7 +212,7 @@ Each split file is a flat JSON array of QA samples:
 ```json
 [
   {
-    "context":        "Gradient descent is an optimisation algorithm ...",
+    "context":        "Gradient descent is an optimization algorithm ...",
     "question":       "What is the role of the learning rate?",
     "answer":         "The learning rate controls the step size ...",
     "question_topic": "Learning Rate Sensitivity",
@@ -241,7 +241,29 @@ e9ed4f86717a9e56d0b4866dd13800d9  client_0_fold1_train.json
 
 ## Phase 2 — Individual Training Baseline (Experiment 1)
 
-Each institution trains a local LoRA adapter on their own data. No data leaves the institution. This produces the individual baseline against which the federated model is compared.
+Each institution trains a local LoRA adapter on their own data, under **three prompt-conditioning regimes**. No data leaves the institution. This produces the individual baseline against which the federated model is compared.
+
+### Three conditioning regimes
+
+| Regime | Prompt template | Decoding at evaluation |
+|---|---|---|
+| **baseline** | context only | diverse beam search (5 outputs per unique context, Hungarian-matched to the 5 references via ROUGE-L)  |
+| **topic** | context + `question_topic` (each QA pair has a unique topic) | standard single-output beam search per sample |
+| **bloom** | context + `bloom_level` and verb (1=Remember … 6=Create) | standard single-output beam search per sample |
+
+Total runs per institution: **3 conditionings × 3 folds = 9 trainings**. The orchestrator script handles all 9 in one invocation and is resume-friendly.
+
+### Early stopping and checkpoints
+
+Training runs for up to **100 epochs** with early stopping based on a fast generation-based metric:
+
+- **Greedy-decoded ROUGE-L** on a fixed 50-sample subsample of the val set (drawn once with `--seed`). This reflects the actual autoregressive generation quality — unlike teacher-forced val loss, which can keep dropping while real generation gets worse.
+- Patience of **10 epochs** without improvement before stopping (configurable via `--patience`).
+- Two model artifacts are kept and evaluated separately at the end:
+  - **best** — lowest-error checkpoint by the early-stop metric
+  - **final** — state at the last completed epoch
+
+Pass `--early-stop-metric val_loss` if you'd rather use the older teacher-forced val loss (faster per epoch but less aligned with generation quality).
 
 ---
 
@@ -252,94 +274,142 @@ Each institution trains a local LoRA adapter on their own data. No data leaves t
 from google.colab import drive
 drive.mount('/content/drive')
 
-# 2. Clone the repo (or upload it to Drive and add the path)
+# 2. Clone the repo
 !git clone https://github.com/basiralab/EquitableEdu /content/EquitableEdu
 %cd /content/EquitableEdu
 
-# 3. Install dependencies
-!pip install -q transformers peft torch torch-geometric \
-    rouge_score bert_score nltk accelerate sentencepiece \
-    "numpy<2" openai
+# 3. Place your OpenAI key file at the repo root (gitignored, we do not commit this).
+#    The orchestrator and train scripts pick it up automatically.
+!echo 'sk-...' > openai_api_key
+!chmod 600 openai_api_key
+
+# 4. Dependencies. torchao must be removed — Colab's pre-installed 0.10 breaks PEFT.
+!pip uninstall -y torchao
+!pip install -q transformers==4.46.0 peft accelerate sentencepiece \
+    rouge_score bert_score nltk scipy openai 'numpy<2'
 ```
 
-Upload your `client<N>_fold*.json` split files (produced in Phase 1) to Drive, e.g. to:
+Upload your Phase 1 splits to Drive, e.g.:
 ```
 /content/drive/MyDrive/unifiedfl/outputs/splits/
+  client_<N>_test.json
+  client_<N>_fold{1,2,3}_train.json
+  client_<N>_fold{1,2,3}_val.json
 ```
+
+The test set is **not used in Phase 2**
 
 ---
 
-### Training Command
+### Recommended: orchestrator script (one command, all 9 runs)
 
-Run one fold at a time. Repeat for folds 1, 2, and 3.
+The orchestrator runs `train_client.py` 9 times (3 conditionings × 3 folds), writes outputs into per-conditioning subdirectories, and skips folds whose `metrics_val.json` already exists.
 
 ```bash
-python unifiedfl/train_client.py \
-    --client-id   <your_client_id_you_used_in_phase1> \
-    --fold        1 \
-    --model       <your_assigned_model> \
-    --family      <your_assigned_model_family> \
-    --targets     <your_assigned_model_targets> \
-    --splits-dir  /content/drive/MyDrive/unifiedfl/outputs/splits \
-    --output-dir  /content/drive/MyDrive/unifiedfl/outputs \
-    --num-epochs  60 \
-    --batch-size  4 \
-    --lr          3e-4 \
-    --patience    10 \
-    --openai-api-key  sk-... (your api key provided by email)
+python experiments/03_run_three_conditionings.py \
+    --splits-dir /content/drive/MyDrive/unifiedfl/outputs/splits \
+    --output-dir /content/drive/MyDrive/unifiedfl/outputs \
+    --client-id  <your_client_id_from_phase_1> \
+    --model      <your_assigned_model> \
+    --family     <your_assigned_model_family> \
+    --targets    <your_assigned_model_targets>
 ```
 
-#### Key hyperparameters
+Comprehensive evaluation (ROUGE-L, BLEU-4, BERTScore + RTC, Faithfulness, QAFactEval, RQUGE, Answer Relevancy, Bloom's BERT, Bloom's LLM judge, GPT-4o QA judge) runs by default and uses your `openai_api_key` file. Pass `--fast-eval` to skip the heavy/LLM metrics if you just want a quick sanity check.
 
-| Argument | Default | What it controls |
-|---|---|---|
-| `--fold` | required | Which CV fold to train on (1, 2, or 3) |
-| `--num-epochs` | 60 | Maximum training epochs |
-| `--batch-size` | 4 | Samples per gradient step |
-| `--lr` | 3e-4 | Peak learning rate (cosine decay with warmup) |
-| `--warmup-ratio` | 0.1 | Fraction of total steps used for LR warm-up |
-| `--grad-clip` | 1.0 | Gradient clipping norm |
-| `--patience` | 10 | Early stopping — halt if val loss does not improve for this many epochs |
-| `--min-delta` | 1e-4 | Minimum improvement in val loss to reset the patience counter |
-| `--lora-r` | 16 | LoRA rank |
-| `--lora-alpha` | 32 | LoRA scaling factor |
-| `--lora-dropout` | 0.1 | LoRA dropout |
-| `--preview-every` | 5 | Print a generated QA from the val set every N epochs (0 = off) |
-| `--checkpoint-every` | 10 | Save a checkpoint every N epochs |
-| `--no-heavy` | off | Skip heavy metrics (UnifiedQA + DeBERTa) in final evaluation |
-| `--openai-api-key` | none | Enable Answer Relevancy and Bloom's LLM judge metrics |
-| `--blooms-model` | `cip29/bert-blooms-taxonomy-classifier` | HuggingFace model ID for the local Bloom's classifier (set to `''` to skip) |
+#### Useful orchestrator flags
+
+| Flag | Purpose |
+|---|---|
+| `--conditionings baseline` | Only run a subset (default: all three) |
+| `--folds 1` | Only run fold 1 |
+| `--force` | Re-run even if `metrics_val.json` exists |
+| `--fast-eval` | Skip heavy/LLM metrics (faster, fewer numbers) |
+| `--num-epochs 30` | Cut training time |
+
+
 
 #### Model choices by architecture
 
 | Model | `--model` | `--family` | `--targets` |
 |---|---|---|---|
-| Flan-T5-small | `google/flan-t5-small` | `t5` | `q v` |
 | Flan-T5-base | `google/flan-t5-base` | `t5` | `q v` |
 | BART-base | `facebook/bart-base` | `bart` | `q_proj v_proj` |
 | LED-base | `allenai/led-base-16384` | `led` | `q_proj v_proj` |
 
 ---
 
-### Running All Three Folds
+### Alternative: invoke `train_client.py` directly
 
-Run the command above three times, changing `--fold 1`, `--fold 2`, `--fold 3`. Each fold writes its outputs to a separate directory.
+You can also run a single conditioning + fold at a time. The output path now embeds the conditioning automatically, so different `--conditioning` runs cannot overwrite each other:
+
+```bash
+python unifiedfl/train_client.py \
+    --client-id    <your_client_id> \
+    --fold         1 \
+    --conditioning baseline \
+    --model        facebook/bart-base \
+    --family       bart \
+    --targets      q_proj v_proj \
+    --splits-dir   /content/drive/MyDrive/unifiedfl/outputs/splits \
+    --output-dir   /content/drive/MyDrive/unifiedfl/outputs \
+    --num-epochs   60 \
+    --patience     10
+```
+
+#### Key hyperparameters
+
+| Argument | Default | What it controls |
+|---|---|---|
+| `--conditioning` | `baseline` | One of `baseline`, `topic`, `bloom` (drives both prompt template and eval strategy) |
+| `--fold` | required | Which CV fold to train on (1, 2, or 3) |
+| `--num-epochs` | 100 | Maximum training epochs |
+| `--batch-size` | 4 | Samples per gradient step |
+| `--lr` | 3e-4 | Peak learning rate (cosine decay with warmup) |
+| `--warmup-ratio` | 0.1 | Fraction of total steps used for LR warm-up |
+| `--grad-clip` | 1.0 | Gradient clipping norm |
+| `--patience` | 10 | Early stopping — halt if the early-stop metric does not improve for this many epochs |
+| `--min-delta` | 1e-4 | Minimum improvement in the early-stop metric to reset the patience counter |
+| `--early-stop-metric` | `rouge_l` | `rouge_l` (greedy decoding on a 50-sample val subsample, default) or `val_loss` (teacher-forced cross-entropy on full val) |
+| `--fast-eval-samples` | 50 | Number of val samples used for the fast ROUGE-L metric (fixed across epochs via `--seed`) |
+| `--lora-r` | 16 | LoRA rank |
+| `--lora-alpha` | 32 | LoRA scaling factor |
+| `--lora-dropout` | 0.1 | LoRA dropout |
+| `--checkpoint-every` | 5 | Save a checkpoint every N epochs |
+| `--no-heavy` | off | Skip heavy metrics (UnifiedQA + DeBERTa) in final evaluation |
+| `--openai-api-key` | auto-loaded from `openai_api_key` file | Enables Answer Relevancy, Bloom's LLM judge, and GPT-4o QA judge |
+
+---
+
+### Output structure (after all 9 runs)
 
 ```
 outputs/
-└── client_0/
-    ├── fold1/
-    │   ├── best/lora_model/          ← best LoRA weights (by val loss)
-    │   ├── final/lora_model/         ← weights at last epoch
-    │   ├── checkpoints/              ← periodic checkpoints for resuming
-    │   ├── loss_history.json         ← train and val loss per epoch
-    │   ├── metrics_val.json          ← all evaluation metrics on the val set
-    │   └── generated_qas_val.json    ← model-generated QA pairs vs. references
-    ├── fold2/
-    └── fold3/
+├── baseline/
+│   └── client_<N>/
+│       ├── fold1/
+│       │   ├── best/lora_model/                         ← best-checkpoint LoRA weights
+│       │   ├── final/lora_model/                        ← final-epoch LoRA weights
+│       │   ├── checkpoints/                             ← periodic checkpoints (every 5 epochs)
+│       │   ├── loss_history.json                        ← train loss, val loss, early-stop metric per epoch
+│       │   └── results/
+│       │       ├── best/
+│       │       │   ├── metrics_val.json                 ← comprehensive metrics on val (best ckpt)
+│       │       │   └── generated_qas_val.json           ← model outputs vs. references (best ckpt)
+│       │       └── final/
+│       │           ├── metrics_val.json                 ← same metrics, evaluated on final ckpt
+│       │           └── generated_qas_val.json           ← outputs from the final ckpt
+│       ├── fold2/
+│       └── fold3/
+├── topic/
+│   └── client_<N>/fold{1,2,3}/...
+└── bloom/
+    └── client_<N>/fold{1,2,3}/...
 ```
 
-`metrics_val.json` contains:
+Both checkpoints are evaluated independently so you can compare best vs. final and see how much overfitting occurred.
+
+`metrics_val.json` contains (with comprehensive eval — i.e. without `--fast-eval`):
 
 | Metric | Description |
 |---|---|
@@ -352,30 +422,45 @@ outputs/
 | `rquge` | RQUGE (approx.) — answer quality score in [1, 5] |
 | `answer_relevancy` | RAGAS Answer Relevancy — cosine similarity of original vs. reverse-generated questions |
 | `blooms_cls_distribution` | Bloom level counts from a local fine-tuned BERT classifier |
-| `blooms_cls_evs_mean` | Educational Value Score from classifier — mean normalised Bloom level in [0, 1] |
-| `blooms_llm_distribution` | Bloom level counts from GPT-4o-mini LLM judge (requires `--openai-api-key`) |
+| `blooms_cls_evs_mean` | Educational Value Score from classifier — mean normalized Bloom level in [0, 1] |
+| `blooms_llm_distribution` | Bloom level counts from GPT-4o-mini LLM judge |
 | `blooms_llm_evs_mean` | Educational Value Score from LLM judge in [0, 1] |
 | `llm_judge_context_grounding_mean` | LLM judge — is the question answerable from the context (1–5) |
 | `llm_judge_educational_value_mean` | LLM judge — pedagogical merit of the question (1–5) |
 | `llm_judge_answer_correctness_mean` | LLM judge — answer is factually correct given the context (1–5) |
 | `llm_judge_answer_relevance_mean` | LLM judge — answer actually addresses the question (1–5) |
-| `llm_judge_overall_mean` | LLM judge — mean across the four dimensions, normalised to [0, 1] |
+| `llm_judge_overall_mean` | LLM judge — mean across the four dimensions, normalized to [0, 1] |
+
+---
+
+### Aggregating results across folds
+
+After the orchestrator finishes, get a summary table of per-fold metrics + per-conditioning means:
+
+```bash
+# best checkpoint (default)
+python experiments/04_aggregate_results.py \
+    --output-dir /content/drive/MyDrive/unifiedfl/outputs \
+    --client-id  <your_client_id> \
+    --save-summary /content/drive/MyDrive/unifiedfl/outputs/summary_best.json
+
+# final checkpoint (compare against best to see overfitting)
+python experiments/04_aggregate_results.py \
+    --output-dir /content/drive/MyDrive/unifiedfl/outputs \
+    --client-id  <your_client_id> \
+    --checkpoint final \
+    --save-summary /content/drive/MyDrive/unifiedfl/outputs/summary_final.json
+```
+
+Send both `summary_*.json` files and the entire `outputs/` directory back to the project coordinator.
 
 ---
 
 ### Resuming After a Colab Disconnect
 
-If training is interrupted, resume from the last saved checkpoint:
+The orchestrator is resume-friendly: re-run the same `experiments/03_run_three_conditionings.py` command and it will skip any (conditioning, fold) pair whose `metrics_val.json` already exists. To force re-running a specific subset, add `--force` and (optionally) `--conditionings <name>` / `--folds N`.
 
-```bash
-python unifiedfl/train_client.py \
-    --client-id 0 \
-    --fold 1 \
-    ... \
-    --resume-from-epoch 30
-```
-
-The checkpoint at `outputs/client_0/fold1/checkpoints/epoch_30/` will be loaded and training will continue from epoch 31.
+For mid-fold resume, `train_client.py` directly supports `--resume-from-epoch N` — it reloads the checkpoint at `outputs/<conditioning>/client_<N>/fold<k>/checkpoints/epoch_N/` and continues from epoch N+1, preserving the early-stopping state and best checkpoint.
 
 ---
 

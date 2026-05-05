@@ -1,4 +1,4 @@
-Gradient descent is an iterative optimisation algorithm used to minimise a loss
+Gradient descent is an iterative optimization algorithm used to minimize a loss
 function by adjusting model parameters in the direction of the steepest descent.
 At each step, the algorithm computes the gradient of the loss with respect to
 every parameter and subtracts a fraction of that gradient from the current
@@ -14,14 +14,14 @@ and decay it over time using a schedule such as step decay or cosine annealing.
 Stochastic gradient descent, or SGD, approximates the true gradient using a
 single randomly sampled training example at each step rather than the full
 dataset. This makes each update noisy but drastically reduces the computational
-cost per step and introduces a form of implicit regularisation. Mini-batch SGD
+cost per step and introduces a form of implicit regularization. Mini-batch SGD
 strikes a balance by computing gradients over a small batch of examples,
-typically between 32 and 512, which allows efficient use of vectorised hardware
+typically between 32 and 512, which allows efficient use of vectorized hardware
 such as GPUs while keeping the noise benefit of stochastic updates.
 
 Momentum is an extension to SGD that accumulates a velocity vector in the
 direction of persistent gradient components. Instead of updating parameters
 purely from the current gradient, momentum adds a fraction of the previous
 update vector. This dampens oscillations across steep dimensions and accelerates
-progress along shallow ones, allowing the optimiser to navigate narrow valleys
+progress along shallow ones, allowing the optimizer to navigate narrow valleys
 in the loss landscape more efficiently.

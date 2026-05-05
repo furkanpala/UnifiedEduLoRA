@@ -145,7 +145,7 @@ def plot_model(graph_data: GraphData, ax_graph, ax_heatmap, ax_bar) -> None:
     step = max(1, N // 80)
     feat_subset = feats[::step]                       # [M, 16]
 
-    # Normalise each feature column to [0, 1] for visual comparison
+    # Normalize each feature column to [0, 1] for visual comparison
     col_min = feat_subset.min(axis=0, keepdims=True)
     col_max = feat_subset.max(axis=0, keepdims=True)
     feat_norm = (feat_subset - col_min) / np.clip(col_max - col_min, 1e-8, None)
@@ -155,7 +155,7 @@ def plot_model(graph_data: GraphData, ax_graph, ax_heatmap, ax_bar) -> None:
     ax_heatmap.set_yticks(range(16))
     ax_heatmap.set_yticklabels(FEATURE_NAMES, fontsize=6)
     ax_heatmap.set_xlabel(f"Node index (every {step}th)", fontsize=7)
-    ax_heatmap.set_title("Node feature heatmap (normalised)", fontsize=9)
+    ax_heatmap.set_title("Node feature heatmap (normalized)", fontsize=9)
     plt.colorbar(im, ax=ax_heatmap, fraction=0.03, pad=0.02)
 
     # ── 3. Layer-type distribution bar ───────────────────────────────────
@@ -258,7 +258,7 @@ def main() -> None:
         figsize=(6 * n_models, 16),
         gridspec_kw={"height_ratios": [3, 1.2, 0.8]},
     )
-    # Normalise axes shape to always be 2-D
+    # Normalize axes shape to always be 2-D
     if n_models == 1:
         axes = axes.reshape(3, 1)
 

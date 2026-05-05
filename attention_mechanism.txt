@@ -20,6 +20,6 @@ gradients and slow down learning.
 Multi-head attention runs several attention operations in parallel, each with its
 own learned projection matrices for queries, keys, and values. The outputs of all
 heads are concatenated and projected back to the model dimension. Different heads
-can specialise in attending to different types of relationships, such as syntactic
+can specialize in attending to different types of relationships, such as syntactic
 dependencies, coreference, or positional patterns, giving the model greater
 expressiveness than a single attention head.

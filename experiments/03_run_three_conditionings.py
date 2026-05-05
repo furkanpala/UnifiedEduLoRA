@@ -59,22 +59,22 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--patience",         type=int,   default=10)
     p.add_argument("--preview-every",    type=int,   default=0)
     p.add_argument("--checkpoint-every", type=int,   default=0)
-    p.add_argument("--full-eval",        action="store_true",
-                   help="Enable heavy (UnifiedQA/DeBERTa) and LLM-based metrics. "
-                        "Default: fast eval only (ROUGE-L, BLEU-4, BERTScore, "
-                        "local Bloom's classifier).")
+    p.add_argument("--fast-eval",        action="store_true",
+                   help="Skip heavy (UnifiedQA/DeBERTa) and LLM-based metrics. "
+                        "Default: comprehensive evaluation (requires OpenAI key for "
+                        "LLM-based metrics; passes --no-heavy to train_client.py "
+                        "when this flag is set).")
     p.add_argument("--openai-api-key",   default=None,
-                   help="Override; otherwise loaded from env / repo / drive. "
-                        "Only used when --full-eval is set.")
+                   help="Override; otherwise loaded from env / repo / drive.")
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
 
-    # Resolve the API key — only needed for full eval
+    # Resolve the API key — used for comprehensive eval (default)
     api_key = None
-    if args.full_eval:
+    if not args.fast_eval:
         if args.openai_api_key and args.openai_api_key.startswith("sk-"):
             api_key, source = args.openai_api_key, "<--openai-api-key arg>"
         else:
@@ -83,23 +83,26 @@ def main() -> None:
             os.environ["OPENAI_API_KEY"] = api_key
             print(f"OpenAI key loaded from: {source}")
         else:
-            print("WARNING: no OpenAI API key found — LLM-based metrics will be skipped")
+            print("WARNING: no OpenAI API key found — LLM-based metrics will be skipped. "
+                  "Place an 'openai_api_key' file at the repo root, set OPENAI_API_KEY, "
+                  "or pass --openai-api-key sk-... to enable them.")
     else:
-        print("Fast eval mode: running ROUGE-L, BLEU-4, BERTScore + local Bloom's classifier only. "
-              "Pass --full-eval to enable heavy/LLM metrics.")
+        print("Fast eval mode: running ROUGE-L, BLEU-4, BERTScore + local Bloom's "
+              "classifier only. Omit --fast-eval to enable comprehensive metrics.")
 
     train_script = str(Path(REPO_DIR) / "unifiedfl" / "train_client.py")
 
     summary: dict[tuple[str, int], int] = {}
 
     for conditioning in args.conditionings:
-        cond_out_dir = Path(args.output_dir) / conditioning
-        cond_out_dir.mkdir(parents=True, exist_ok=True)
-
         for fold in args.folds:
-            metrics_path = (cond_out_dir / f"client_{args.client_id}"
-                            / f"fold{fold}" / "metrics_val.json")
-            if metrics_path.exists() and not args.force:
+            # train_client.py writes to {output_dir}/{conditioning}/client_{id}/fold{N}/
+            # and saves per-checkpoint metrics under results/{best,final}/.
+            fold_dir = (Path(args.output_dir) / conditioning
+                        / f"client_{args.client_id}" / f"fold{fold}")
+            new_metrics = fold_dir / "results" / "best" / "metrics_val.json"
+            old_metrics = fold_dir / "metrics_val.json"   # legacy layout
+            if (new_metrics.exists() or old_metrics.exists()) and not args.force:
                 print(f"\n[skip] {conditioning} fold{fold} — already has metrics_val.json. "
                       f"Pass --force to rerun.")
                 summary[(conditioning, fold)] = 0
@@ -113,7 +116,7 @@ def main() -> None:
                 "--family",           args.family,
                 "--targets",          *args.targets,
                 "--splits-dir",       args.splits_dir,
-                "--output-dir",       str(cond_out_dir),
+                "--output-dir",       args.output_dir,
                 "--num-epochs",       str(args.num_epochs),
                 "--batch-size",       str(args.batch_size),
                 "--lr",               str(args.lr),
@@ -122,7 +125,7 @@ def main() -> None:
                 "--checkpoint-every", str(args.checkpoint_every),
                 "--conditioning",     conditioning,
             ]
-            if not args.full_eval:
+            if args.fast_eval:
                 cmd.append("--no-heavy")
             if api_key:
                 cmd += ["--openai-api-key", api_key]

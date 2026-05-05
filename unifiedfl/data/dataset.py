@@ -34,7 +34,7 @@ PROMPT_TEMPLATES: Dict[str, str] = {
 
 BLOOM_VERBS: Dict[int, str] = {
     1: "Remember", 2: "Understand", 3: "Apply",
-    4: "Analyse",  5: "Evaluate",   6: "Create",
+    4: "Analyze",  5: "Evaluate",   6: "Create",
 }
 
 
@@ -67,7 +67,7 @@ class QADataset(Dataset):
     Tokenisation is performed lazily in __getitem__.
 
     `conditioning` selects the prompt template:
-        - "baseline": context only (default, original behaviour)
+        - "baseline": context only (default, original behavior)
         - "topic":    prompt also names the question_topic field
         - "bloom":    prompt also names the bloom_level field
     """

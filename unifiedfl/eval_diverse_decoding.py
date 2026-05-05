@@ -134,7 +134,7 @@ def _hungarian_match(
     generations: List[str], references: List[str],
 ) -> List[Tuple[str, str]]:
     """
-    Pair each generation with one reference such that total ROUGE-L is maximised.
+    Pair each generation with one reference such that total ROUGE-L is maximized.
     Returns list of (generation, reference) pairs in matched order.
     """
     from rouge_score import rouge_scorer
@@ -142,7 +142,7 @@ def _hungarian_match(
 
     scorer = rouge_scorer.RougeScorer(["rougeL"], use_stemmer=True)
     n = max(len(generations), len(references))
-    cost = np.full((n, n), 1.0)  # 1 - rouge → minimise = maximise rouge
+    cost = np.full((n, n), 1.0)  # 1 - rouge → minimize = maximize rouge
     for i, g in enumerate(generations):
         for j, r in enumerate(references):
             cost[i, j] = 1.0 - scorer.score(r, g)["rougeL"].fmeasure

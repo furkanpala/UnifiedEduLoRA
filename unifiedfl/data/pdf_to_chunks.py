@@ -56,7 +56,7 @@ def _strip_boilerplate(text: str) -> str:
 
 def _clean(text: str) -> str:
     text = _strip_boilerplate(text)
-    # Re-join hyphenated line-breaks (e.g. "opti-\nmisation" → "optimisation")
+    # Re-join hyphenated line-breaks (e.g. "opti-\nmization" → "optimization")
     text = re.sub(r"-\n(\w)", r"\1", text)
     # Collapse multiple blank lines
     text = re.sub(r"\n{3,}", "\n\n", text)
@@ -64,7 +64,7 @@ def _clean(text: str) -> str:
     text = re.sub(r"(?m)^\s*\d+\s*$", "", text)
     # Flatten single newlines within a paragraph to spaces
     text = re.sub(r"(?<!\n)\n(?!\n)", " ", text)
-    # Normalise whitespace
+    # Normalize whitespace
     text = re.sub(r"[ \t]+", " ", text)
     return text.strip()
 

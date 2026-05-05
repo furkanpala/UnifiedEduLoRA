@@ -78,7 +78,7 @@ logger = logging.getLogger("generate_qa")
 # ─────────────────────────────────────────────────────────────────────────────
 
 _SYSTEM = """\
-You are an expert educational content designer specialising in machine learning \
+You are an expert educational content designer specializing in machine learning \
 and AI. Your task is to generate pedagogically rigorous question-answer pairs \
 from ML educational text.
 
@@ -96,7 +96,7 @@ boilerplate - you must NOT generate QA pairs. Instead respond with:
 """
 
 _USER = """\
-Analyse the following machine learning text and produce:
+Analyze the following machine learning text and produce:
   1. context_topics - 2 to 6 concise ML/AI concept labels (2-4 words each).
   2. qa_pairs - exactly {n_pairs} question-answer pairs.
 
@@ -112,9 +112,9 @@ question_topic:
 
 --- BLOOM'S TAXONOMY ---
   1 Remember  - define, list, name, state
-  2 Understand - describe, summarise, explain
+  2 Understand - describe, summarize, explain
   3 Apply      - solve, demonstrate, compute
-  4 Analyse    - compare, contrast, distinguish
+  4 Analyze    - compare, contrast, distinguish
   5 Evaluate   - critique, assess, justify
   6 Create     - design, propose, formulate
 Cover a VARIETY of levels - do not cluster at 1 or 2.
@@ -122,7 +122,7 @@ Cover a VARIETY of levels - do not cluster at 1 or 2.
 --- HARD RULES ---
   - Answerable from the text alone (set answerable_from_context: true; omit pair if not).
   - No questions about "the author" or "the paper" or "the date" etc.
-  - Answers must synthesise - do not copy a single sentence verbatim.
+  - Answers must synthesize - do not copy a single sentence verbatim.
   - If the text has no substantive educational content, respond with {{"skip": true, "reason": "..."}} and nothing else.
 
 TEXT:

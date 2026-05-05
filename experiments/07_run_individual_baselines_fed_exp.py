@@ -25,16 +25,11 @@ to override).
 from __future__ import annotations
 
 import argparse
-import os
 import subprocess
-import sys
 import time
 from pathlib import Path
 
 REPO_DIR = str(Path(__file__).resolve().parent.parent)
-sys.path.insert(0, str(Path(__file__).parent))
-
-from _common import load_openai_key, default_key_search_paths
 
 # ── Client specs ──────────────────────────────────────────────────────────────
 # (client_id, model_hf_id, family, lora_targets)
@@ -78,9 +73,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    # Resolve OpenAI key — only used if full eval is wanted; fast eval is default
-    # (no --openai-api-key passed to child, consistent with step 3 default)
-    api_key, _ = load_openai_key(*default_key_search_paths(REPO_DIR, args.drive_dir))
+    # Note: this orchestrator runs in fast-eval mode (--no-heavy passed to
+    # train_client.py), so no OpenAI key is needed here.
 
     train_script = str(Path(REPO_DIR) / "unifiedfl" / "train_client.py")
     global_test_file = str(Path(args.splits_dir) / "global_test.json")
@@ -92,11 +86,11 @@ def main() -> None:
             continue
 
         # train_client.py outputs to {output_dir}/{conditioning}/client_{id}/fold{fold}/
-        metrics_path = (
-            Path(args.output_dir) / "topic"
-            / f"client_{cid}" / "fold1" / "metrics_val.json"
-        )
-        if metrics_path.exists() and not args.force:
+        # and per-checkpoint metrics live under results/{best,final}/.
+        fold_dir = Path(args.output_dir) / "topic" / f"client_{cid}" / "fold1"
+        new_metrics = fold_dir / "results" / "best" / "metrics_val.json"
+        old_metrics = fold_dir / "metrics_val.json"   # legacy layout
+        if (new_metrics.exists() or old_metrics.exists()) and not args.force:
             print(f"\n[skip] client {cid} — already has metrics_val.json. "
                   f"Pass --force to rerun.")
             summary[cid] = 0

@@ -1,7 +1,7 @@
 """
 Evaluation metrics for EquitableEdu.
 
-Organised by weight / dependency:
+Organized by weight / dependency:
 
   Lightweight — reference-based (always run):
     ROUGE-L, BLEU-4, BERTScore
@@ -549,9 +549,9 @@ def compute_blooms_llm(
 
     bloom_desc = (
         "1=Remember (define, list, state), "
-        "2=Understand (explain, describe, summarise), "
+        "2=Understand (explain, describe, summarize), "
         "3=Apply (solve, compute, demonstrate), "
-        "4=Analyse (compare, contrast, distinguish), "
+        "4=Analyze (compare, contrast, distinguish), "
         "5=Evaluate (critique, assess, justify), "
         "6=Create (design, propose, formulate)"
     )
@@ -662,7 +662,7 @@ def compute_llm_judge(
         - answer_correctness  : A is factually correct given the context
         - answer_relevance    : A actually addresses the question that was asked
 
-    A per-sample `overall` score is the mean of the four dimensions normalised
+    A per-sample `overall` score is the mean of the four dimensions normalized
     to [0, 1] via (mean - 1) / 4.
 
     Args:

@@ -34,7 +34,7 @@ from pathlib import Path
 
 BLOOM_VERBS = {
     1: "Remember", 2: "Understand", 3: "Apply",
-    4: "Analyse",  5: "Evaluate",   6: "Create",
+    4: "Analyze",  5: "Evaluate",   6: "Create",
 }
 
 PROMPT_TEMPLATES = {

@@ -89,7 +89,7 @@ def parse_args() -> argparse.Namespace:
                    help="Directory containing split JSON files from split.py")
 
     # Training
-    p.add_argument("--num-epochs",     type=int,   default=60)
+    p.add_argument("--num-epochs",     type=int,   default=100)
     p.add_argument("--batch-size",     type=int,   default=4)
     p.add_argument("--lr",             type=float, default=3e-4)
     p.add_argument("--warmup-ratio",   type=float, default=0.1)
@@ -99,9 +99,19 @@ def parse_args() -> argparse.Namespace:
 
     # Early stopping
     p.add_argument("--patience",  type=int,   default=10,
-                   help="Stop if val loss does not improve for this many epochs")
+                   help="Stop if the early-stop metric does not improve for this many epochs.")
     p.add_argument("--min-delta", type=float, default=1e-4,
-                   help="Minimum improvement in val loss to reset the patience counter")
+                   help="Minimum improvement in the early-stop metric to reset the patience counter.")
+    p.add_argument("--early-stop-metric", choices=["rouge_l", "val_loss"],
+                   default="rouge_l",
+                   help="Metric tracked for early stopping and best-checkpoint selection. "
+                        "rouge_l (default): greedy-decoded ROUGE-L on a fixed val subsample - "
+                        "directly reflects autoregressive generation quality. "
+                        "val_loss: teacher-forced cross-entropy on the full val set - faster "
+                        "but can decouple from real generation quality (exposure bias).")
+    p.add_argument("--fast-eval-samples", type=int, default=50,
+                   help="Number of val samples used for the fast ROUGE-L early-stop metric. "
+                        "Drawn once with seed=args.seed and reused every epoch.")
 
     # LoRA
     p.add_argument("--lora-r",       type=int,   default=16)
@@ -123,7 +133,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--eval-diversity-penalty",    type=float, default=1.0)
 
     # Checkpointing / resuming
-    p.add_argument("--checkpoint-every", type=int, default=10,
+    p.add_argument("--checkpoint-every", type=int, default=5,
                    help="Save a checkpoint every N epochs (0 = only at end)")
     p.add_argument("--resume-from-epoch", type=int, default=0,
                    help="Resume from this epoch's checkpoint (0 = start fresh)")
@@ -188,6 +198,8 @@ def _save_checkpoint(
     best_val_loss: float,
     patience_count: int,
     ckpt_dir: Path,
+    es_metric_history: list = None,
+    best_es_metric: float = None,
 ) -> None:
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     client_model.model.save_pretrained(str(ckpt_dir / "lora_model"))
@@ -198,6 +210,9 @@ def _save_checkpoint(
             "scheduler":          scheduler.state_dict(),
             "train_loss_history": train_loss_history,
             "val_loss_history":   val_loss_history,
+            "es_metric_history":  es_metric_history if es_metric_history is not None else [],
+            "best_es_metric":     best_es_metric if best_es_metric is not None else best_val_loss,
+            # Kept for backward compatibility with old checkpoints
             "best_val_loss":      best_val_loss,
             "patience_count":     patience_count,
             "rng_python":         random.getstate(),
@@ -286,6 +301,47 @@ def _preview(
     print(f"  │ GENERATED: {generated}")
     print(f"  └{'─' * 50}")
     client_model.model.train()
+
+
+@torch.no_grad()
+def _fast_rouge_l(
+    client_model: ClientModel,
+    samples: list,
+    args: argparse.Namespace,
+    device: torch.device,
+    use_amp: bool,
+) -> float:
+    """
+    Greedy-decoded ROUGE-L on a fixed val subsample. Used as the early-stop
+    metric. Per-sample greedy gives a fast, deterministic signal that tracks
+    autoregressive generation quality (unlike teacher-forced val loss).
+    """
+    from rouge_score import rouge_scorer
+    scorer = rouge_scorer.RougeScorer(["rougeL"], use_stemmer=True)
+    tokenizer = client_model.tokenizer
+
+    client_model.model.eval()
+    total = 0.0
+    for sample in samples:
+        prompt = render_prompt(sample, args.conditioning)
+        enc = tokenizer(
+            prompt, max_length=args.max_input_len,
+            truncation=True, padding=False, return_tensors="pt",
+        ).to(device)
+        with torch.amp.autocast("cuda", enabled=use_amp, dtype=torch.bfloat16):
+            out_ids = client_model.generate(
+                input_ids=enc["input_ids"],
+                attention_mask=enc["attention_mask"],
+                num_beams=1,
+                max_new_tokens=args.max_target_len,
+                no_repeat_ngram_size=3,
+                early_stopping=True,
+            )
+        gen = tokenizer.decode(out_ids[0], skip_special_tokens=True)
+        ref = f"Question: {sample['question']}\nAnswer: {sample['answer']}"
+        total += scorer.score(ref, gen)["rougeL"].fmeasure
+    client_model.model.train()
+    return total / max(len(samples), 1)
 
 
 @torch.no_grad()
@@ -431,6 +487,79 @@ def _evaluate_baseline_diverse(
     return preds
 
 
+def _run_full_eval(
+    client_model: ClientModel,
+    samples: list,
+    args: argparse.Namespace,
+    device: torch.device,
+    use_amp: bool,
+    out_dir: Path,
+    split_name: str,
+) -> dict:
+    """
+    Generate predictions for `samples`, run the comprehensive metric suite, and
+    write metrics_<split_name>.json + generated_qas_<split_name>.json into
+    `out_dir`. Handles GPU memory:
+      - moves the LM to GPU for generation
+      - moves it to CPU before loading the heavy metric models
+    Returns the full metrics dict.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Make sure the LM is on GPU for autoregressive generation
+    if device.type == "cuda":
+        client_model.model.to(device)
+        gc.collect()
+        torch.cuda.empty_cache()
+
+    print(f"  Generating predictions on {len(samples)} {split_name} samples …")
+    preds, refs, contexts = _evaluate(client_model, samples, args, device, use_amp)
+
+    # Free the LM from GPU before loading the heavy metric models
+    if device.type == "cuda":
+        client_model.model.to("cpu")
+        gc.collect()
+        torch.cuda.empty_cache()
+
+    quick = compute_all_metrics(preds, refs, device)
+    print(
+        f"  ROUGE-L={quick['rouge_l']:.3f}  "
+        f"BLEU-4={quick['bleu_4']:.3f}  "
+        f"BERTScore={quick['bertscore_f1']:.3f}"
+    )
+
+    print(f"  Running comprehensive metrics …")
+    metrics = compute_comprehensive_metrics(
+        generated=preds,
+        references=refs,
+        contexts=contexts,
+        device=device,
+        openai_api_key=args.openai_api_key,
+        run_heavy=not args.no_heavy,
+        blooms_model=args.blooms_model or None,
+    )
+
+    metrics_path = out_dir / f"metrics_{split_name}.json"
+    metrics_path.write_text(json.dumps(metrics, indent=2))
+    print(f"  Metrics saved → {metrics_path}")
+
+    qa_records = [
+        {
+            "context":        s["context"],
+            "reference":      f"Question: {s['question']}\nAnswer: {s['answer']}",
+            "generated":      p,
+            "question_topic": s.get("question_topic", ""),
+            "bloom_level":    s.get("bloom_level"),
+            "difficulty":     s.get("difficulty", ""),
+        }
+        for s, p in zip(samples, preds)
+    ]
+    qa_path = out_dir / f"generated_qas_{split_name}.json"
+    qa_path.write_text(json.dumps(qa_records, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"  Generated QAs saved → {qa_path}")
+    return metrics
+
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -442,7 +571,10 @@ def main() -> None:
     pin_mem = device.type == "cuda"
 
     output_dir = Path(args.output_dir)
-    client_dir = output_dir / f"client_{args.client_id}" / f"fold{args.fold}"
+    # Conditioning is embedded in the path so multiple --conditioning runs with
+    # the same --output-dir don't overwrite each other. Final path:
+    #   {output_dir}/{conditioning}/client_{id}/fold{N}/
+    client_dir = output_dir / args.conditioning / f"client_{args.client_id}" / f"fold{args.fold}"
     ckpt_base  = client_dir / "checkpoints"
     best_dir   = client_dir / "best"
     client_dir.mkdir(parents=True, exist_ok=True)
@@ -487,11 +619,13 @@ def main() -> None:
     scheduler    = get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps)
 
     # Resume from checkpoint if requested
-    loss_history:     list = []
-    val_loss_history: list = []
-    best_val_loss:    float = float("inf")
-    patience_count:   int   = 0
-    start_epoch:      int   = 0
+    loss_history:        list = []   # avg train CE per epoch
+    val_loss_history:    list = []   # val CE per epoch (always recorded)
+    es_metric_history:   list = []   # early-stop metric per epoch
+    best_es_metric:      float = float("-inf") if args.early_stop_metric == "rouge_l" else float("inf")
+    higher_is_better:    bool  = (args.early_stop_metric == "rouge_l")
+    patience_count:      int   = 0
+    start_epoch:         int   = 0
 
     if args.resume_from_epoch > 0:
         ckpt_dir = ckpt_base / f"epoch_{args.resume_from_epoch}"
@@ -500,13 +634,25 @@ def main() -> None:
         loss_history      = state.get("train_loss_history",
                                        state.get("loss_history", []))
         val_loss_history  = state.get("val_loss_history", [])
-        best_val_loss     = state.get("best_val_loss", float("inf"))
+        es_metric_history = state.get("es_metric_history", [])
+        best_es_metric    = state.get("best_es_metric",
+                                       state.get("best_val_loss", best_es_metric))
         patience_count    = state.get("patience_count", 0)
         # Scheduler state is already restored inside _load_checkpoint;
         # do NOT step it manually — that would double-advance the LR curve.
 
     # Fix one val sample for consistent per-epoch preview
     preview_sample = random.choice(val_samples)
+
+    # Fix the val subsample used by the fast ROUGE-L early-stop metric.
+    # Drawn once with the run's seed so the metric is comparable across epochs
+    # AND across runs that resume from a checkpoint.
+    es_subsample = []
+    if args.early_stop_metric == "rouge_l":
+        n_es = min(args.fast_eval_samples, len(val_samples))
+        es_rng = random.Random(args.seed)
+        es_subsample = es_rng.sample(val_samples, n_es)
+        print(f"  Early stopping on greedy ROUGE-L over {n_es} fixed val samples.")
 
     # ── Training loop ─────────────────────────────────────────────────────────
     client_model.model.train()
@@ -549,10 +695,22 @@ def main() -> None:
         val_loss_history.append(val_loss)
         client_model.model.train()
 
-        # Early stopping check
-        improved = val_loss < best_val_loss - args.min_delta
+        # Compute the early-stop metric
+        if args.early_stop_metric == "rouge_l":
+            es_metric = _fast_rouge_l(
+                client_model, es_subsample, args, device, use_amp,
+            )
+        else:
+            es_metric = val_loss
+        es_metric_history.append(es_metric)
+
+        # Early stopping check (direction depends on metric type)
+        if higher_is_better:
+            improved = es_metric > best_es_metric + args.min_delta
+        else:
+            improved = es_metric < best_es_metric - args.min_delta
         if improved:
-            best_val_loss  = val_loss
+            best_es_metric = es_metric
             patience_count = 0
             _save_best(client_model, best_dir)
             status = "best"
@@ -560,9 +718,11 @@ def main() -> None:
             patience_count += 1
             status = f"patience {patience_count}/{args.patience}"
 
+        es_label = "rouge_l" if args.early_stop_metric == "rouge_l" else "val_loss"
         print(
             f"  Epoch {epoch + 1:>3}/{args.num_epochs}"
-            f" — train={avg_loss:.4f}  val={val_loss:.4f}  [{status}]"
+            f" — train={avg_loss:.4f}  val={val_loss:.4f}  "
+            f"{es_label}={es_metric:.4f}  [{status}]"
         )
 
         # Val sample preview
@@ -576,9 +736,11 @@ def main() -> None:
                 epoch=epoch + 1,
                 train_loss_history=loss_history,
                 val_loss_history=val_loss_history,
-                best_val_loss=best_val_loss,
+                best_val_loss=best_es_metric,
                 patience_count=patience_count,
                 ckpt_dir=ckpt_base / f"epoch_{epoch + 1}",
+                es_metric_history=es_metric_history,
+                best_es_metric=best_es_metric,
             )
 
         # Early stopping exit
@@ -587,120 +749,75 @@ def main() -> None:
             stopped_early = True
             break
 
-    # Save loss histories
+    # Save histories
     with open(client_dir / "loss_history.json", "w") as f:
-        json.dump({"train": loss_history, "val": val_loss_history}, f, indent=2)
+        json.dump({
+            "train":           loss_history,
+            "val":             val_loss_history,
+            "es_metric":       es_metric_history,
+            "es_metric_name":  args.early_stop_metric,
+        }, f, indent=2)
 
-    # Save final model weights
+    # Save final model weights (state at the last completed epoch)
     final_dir = client_dir / "final"
     client_model.model.save_pretrained(str(final_dir / "lora_model"))
     print(f"\nFinal model saved → {final_dir}")
 
-    # Load best checkpoint for evaluation
-    print("\nLoading best checkpoint for evaluation …")
-    _load_best(client_model, best_dir)
+    # Free DataLoaders before evaluation
+    del train_loader, val_loader
+    gc.collect()
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
 
     # Make sure NLTK sentence tokenizer is available for downstream metrics
     if not args.no_heavy:
         _ensure_nltk_punkt()
 
-    # ── Comprehensive evaluation on validation set ─────────────────────────────
-    print("\nGenerating predictions on the full validation set …")
-    preds, refs, contexts = _evaluate(client_model, val_samples, args, device, use_amp)
-
-    # Free GPU memory before loading the eval models — UnifiedQA, DeBERTa-NLI,
-    # BertScore distilbert and the bloom classifier together can OOM a T4
-    # if the LoRA model is still resident.
-    if device.type == "cuda":
-        client_model.model.to("cpu")
-        del train_loader, val_loader
-        gc.collect()
-        torch.cuda.empty_cache()
-
-    # Quick summary
-    quick = compute_all_metrics(preds, refs, device)
-    print(
-        f"  ROUGE-L={quick['rouge_l']:.3f}  "
-        f"BLEU-4={quick['bleu_4']:.3f}  "
-        f"BERTScore={quick['bertscore_f1']:.3f}"
-    )
-
-    # Full metric suite
-    print("\nRunning comprehensive metrics (may take several minutes) …")
-    all_metrics = compute_comprehensive_metrics(
-        generated=preds,
-        references=refs,
-        contexts=contexts,
-        device=device,
-        openai_api_key=args.openai_api_key,
-        run_heavy=not args.no_heavy,
-        blooms_model=args.blooms_model or None,
-    )
-
-    metrics_path = client_dir / "metrics_val.json"
-    with open(metrics_path, "w") as f:
-        json.dump(all_metrics, f, indent=2)
-    print(f"  Metrics saved → {metrics_path}")
-
-    # Save generated QA pairs alongside references
-    qa_records = [
-        {
-            "context":        sample["context"],
-            "reference":      f"Question: {sample['question']}\nAnswer: {sample['answer']}",
-            "generated":      pred,
-            "question_topic": sample.get("question_topic", ""),
-            "bloom_level":    sample.get("bloom_level"),
-            "difficulty":     sample.get("difficulty", ""),
-        }
-        for sample, pred in zip(val_samples, preds)
-    ]
-    qa_path = client_dir / "generated_qas_val.json"
-    with open(qa_path, "w", encoding="utf-8") as f:
-        json.dump(qa_records, f, indent=2, ensure_ascii=False)
-    print(f"  Generated QAs saved → {qa_path}")
-
-    # ── Optional global test set evaluation ──────────────────────────────────
+    # Optionally load the global test set once
+    global_test_samples = None
     if args.global_test_file:
         global_test_path = Path(args.global_test_file)
-        if not global_test_path.exists():
-            print(f"\nWARNING: --global-test-file not found: {global_test_path} — skipping.")
-        else:
-            print(f"\nEvaluating on global test set: {global_test_path} …")
-            # Model was moved to CPU after the val-set eval to free GPU for the
-            # metric models — move it back before generating on the global test.
-            if device.type == "cuda":
-                client_model.model.to(device)
-                gc.collect()
-                torch.cuda.empty_cache()
+        if global_test_path.exists():
             global_test_samples = json.loads(global_test_path.read_text(encoding="utf-8"))
-            g_preds, g_refs, g_contexts = _evaluate(
-                client_model, global_test_samples, args, device, use_amp
-            )
-            # Move back to CPU before computing the heavy metric models again.
-            if device.type == "cuda":
-                client_model.model.to("cpu")
-                gc.collect()
-                torch.cuda.empty_cache()
-            g_quick = compute_all_metrics(g_preds, g_refs, device)
-            print(
-                f"  Global ROUGE-L={g_quick['rouge_l']:.3f}  "
-                f"BLEU-4={g_quick['bleu_4']:.3f}  "
-                f"BERTScore={g_quick['bertscore_f1']:.3f}"
-            )
-            g_metrics = compute_comprehensive_metrics(
-                generated=g_preds,
-                references=g_refs,
-                contexts=g_contexts,
-                device=device,
-                openai_api_key=args.openai_api_key,
-                run_heavy=not args.no_heavy,
-                blooms_model=args.blooms_model or None,
-            )
-            g_metrics_path = client_dir / "metrics_global_test.json"
-            g_metrics_path.write_text(json.dumps(g_metrics, indent=2))
-            print(f"  Global test metrics saved → {g_metrics_path}")
+        else:
+            print(f"\nWARNING: --global-test-file not found: {global_test_path} — skipping.")
+
+    results_dir = client_dir / "results"
+
+    # ── Eval FINAL checkpoint (model already has final-epoch weights) ────────
+    print(f"\n{'=' * 60}\n  Evaluating FINAL checkpoint\n{'=' * 60}")
+    _run_full_eval(
+        client_model, val_samples, args, device, use_amp,
+        out_dir=results_dir / "final", split_name="val",
+    )
+    if global_test_samples is not None:
+        _run_full_eval(
+            client_model, global_test_samples, args, device, use_amp,
+            out_dir=results_dir / "final", split_name="global_test",
+        )
+
+    # ── Eval BEST checkpoint ─────────────────────────────────────────────────
+    print(f"\n{'=' * 60}\n  Loading BEST checkpoint\n{'=' * 60}")
+    # Move the LM back to GPU before swapping LoRA weights and generating.
+    if device.type == "cuda":
+        client_model.model.to(device)
+        gc.collect()
+        torch.cuda.empty_cache()
+    _load_best(client_model, best_dir)
+
+    print(f"\n{'=' * 60}\n  Evaluating BEST checkpoint\n{'=' * 60}")
+    _run_full_eval(
+        client_model, val_samples, args, device, use_amp,
+        out_dir=results_dir / "best", split_name="val",
+    )
+    if global_test_samples is not None:
+        _run_full_eval(
+            client_model, global_test_samples, args, device, use_amp,
+            out_dir=results_dir / "best", split_name="global_test",
+        )
 
     print(f"\nAll outputs saved to {client_dir}")
+    print(f"  Per-checkpoint metrics → {results_dir}/{{best,final}}/metrics_*.json")
 
 
 if __name__ == "__main__":

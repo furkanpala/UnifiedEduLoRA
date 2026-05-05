@@ -34,7 +34,7 @@ ENHANCE_PROMPT = (
     "- question_topic: a short noun phrase (3-6 words) naming the specific "
     "topic this QA pair targets within the context.\n"
     "- bloom_level: integer 1-6 according to Bloom's taxonomy (1=Remember, "
-    "2=Understand, 3=Apply, 4=Analyse, 5=Evaluate, 6=Create).\n\n"
+    "2=Understand, 3=Apply, 4=Analyze, 5=Evaluate, 6=Create).\n\n"
     "CONTEXT: {context}\n\n"
     "QUESTION: {question}\n"
     "ANSWER: {answer}\n\n"

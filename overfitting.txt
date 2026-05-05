@@ -1,29 +1,29 @@
 Overfitting occurs when a model learns the training data so closely that it
 captures noise and idiosyncrasies specific to that sample rather than the
 underlying statistical pattern. An overfit model achieves low training loss but
-fails to generalise, exhibiting high loss on unseen validation or test data. The
+fails to generalize, exhibiting high loss on unseen validation or test data. The
 gap between training and validation performance is a practical diagnostic for
 detecting overfitting.
 
 Model capacity is the primary driver of overfitting risk. High-capacity models
 such as deep neural networks with many parameters have enough degrees of freedom
-to memorise training labels without learning meaningful features. Reducing
-capacity, collecting more data, or applying regularisation techniques are the
+to memorize training labels without learning meaningful features. Reducing
+capacity, collecting more data, or applying regularization techniques are the
 standard remedies.
 
-L2 regularisation, also called weight decay, adds a penalty term to the loss
+L2 regularization, also called weight decay, adds a penalty term to the loss
 function proportional to the squared magnitude of all model weights. This
-encourages the optimiser to keep weights small, which biases the model toward
+encourages the optimizer to keep weights small, which biases the model toward
 smoother decision boundaries and reduces sensitivity to individual training
-examples. The strength of the penalty is controlled by a regularisation
+examples. The strength of the penalty is controlled by a regularization
 coefficient lambda, which must be tuned as a hyperparameter.
 
-Dropout is a regularisation technique specific to neural networks in which a
+Dropout is a regularization technique specific to neural networks in which a
 random subset of neurons is set to zero during each forward pass of training.
 This prevents co-adaptation, a phenomenon where neurons become overly reliant on
 specific other neurons and therefore fail to learn independently useful features.
 At inference time, dropout is disabled and all neurons are active, but their
 outputs are scaled by the dropout probability to maintain the same expected
 activation magnitude. The combination of dropout and weight decay is standard
-practice in training large networks and tends to produce models that generalise
-substantially better than unregularised baselines.
+practice in training large networks and tends to produce models that generalize
+substantially better than unregularized baselines.
