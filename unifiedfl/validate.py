@@ -1,17 +1,30 @@
 """
 Validate a client data file before running split.py.
 
-Checks that the file conforms to the required format:
+Two modes:
+
+STRICT (default) — for data produced by Phase 1's generate_qa.py:
   - JSON array of entry objects
   - Each entry has: entry_id, source_description, clean_context, context_topics, qa_pairs
   - Each qa_pair has: question, answer, question_topic, bloom_level, difficulty,
                       bloom_justification, answerable_from_context
   - Enforces content constraints (word counts, bloom range, difficulty values, etc.)
 
+LENIENT (--lenient) — for machine-enhanced data prepared outside Phase 1:
+  - Accepts both proper JSON arrays AND concatenated/streaming JSON
+  - Validates ONLY the fields the training code actually consumes:
+      entry-level : clean_context, qa_pairs
+      qa-level    : question, answer, question_topic, bloom_level (int 1-6)
+  - Skips Phase-1 audit fields (entry_id, source_description, context_topics,
+    bloom_justification, answerable_from_context) and difficulty.
+
 Usage:
+  # strict (Phase 1 collaborators)
   python validate.py client0_data.json
-  python validate.py client0_data.json client1_data.json
   python validate.py --client 0:client0_data.json --client 1:client1_data.json
+
+  # lenient (data already enhanced by experiments/05_enhance_all_datasets.py etc.)
+  python validate.py --lenient ML_QA_LectureNotes_MIT_enhanced.json
 """
 
 from __future__ import annotations
@@ -34,67 +47,70 @@ VALID_DIFFICULTIES  = {"easy", "medium", "hard"}
 MIN_CONTEXT_WORDS   = 50     # lenient lower bound (spec says 150, but allow shorter)
 MAX_CONTEXT_WORDS   = 600    # lenient upper bound (spec says 400)
 
-def _check_entry(i: int, entry: Any) -> List[str]:
+def _check_entry(i: int, entry: Any, lenient: bool = False) -> List[str]:
     errors: List[str] = []
     loc = f"entry[{i}]"
 
     if not isinstance(entry, dict):
         return [f"{loc}: expected object, got {type(entry).__name__}"]
 
-    missing = ENTRY_REQUIRED_KEYS - entry.keys()
-    if missing:
-        errors.append(f"{loc}: missing keys: {sorted(missing)}")
+    if not lenient:
+        missing = ENTRY_REQUIRED_KEYS - entry.keys()
+        if missing:
+            errors.append(f"{loc}: missing keys: {sorted(missing)}")
 
-    # entry_id
-    eid = entry.get("entry_id", "")
-    if not isinstance(eid, str) or not eid.strip():
-        errors.append(f"{loc}: entry_id must be a non-empty string")
+        # entry_id (strict only)
+        eid = entry.get("entry_id", "")
+        if not isinstance(eid, str) or not eid.strip():
+            errors.append(f"{loc}: entry_id must be a non-empty string")
 
-    # source_description
-    src = entry.get("source_description", "")
-    if not isinstance(src, str) or not src.strip():
-        errors.append(f"{loc}: source_description must be a non-empty string")
+        # source_description (strict only)
+        src = entry.get("source_description", "")
+        if not isinstance(src, str) or not src.strip():
+            errors.append(f"{loc}: source_description must be a non-empty string")
 
-    # clean_context
+        # context_topics (strict only)
+        topics = entry.get("context_topics", None)
+        if not isinstance(topics, list) or len(topics) == 0:
+            errors.append(f"{loc}: context_topics must be a non-empty list")
+        elif not all(isinstance(t, str) and t.strip() for t in topics):
+            errors.append(f"{loc}: context_topics must be a list of non-empty strings")
+
+    # clean_context — required in both modes (used by training)
     ctx = entry.get("clean_context", "")
     if not isinstance(ctx, str) or not ctx.strip():
         errors.append(f"{loc}: clean_context must be a non-empty string")
-    else:
+    elif not lenient:
         wc = len(ctx.split())
         if wc < MIN_CONTEXT_WORDS:
             errors.append(f"{loc}: clean_context too short ({wc} words, minimum {MIN_CONTEXT_WORDS})")
         if wc > MAX_CONTEXT_WORDS:
             errors.append(f"{loc}: clean_context too long ({wc} words, maximum {MAX_CONTEXT_WORDS})")
 
-    # context_topics
-    topics = entry.get("context_topics", None)
-    if not isinstance(topics, list) or len(topics) == 0:
-        errors.append(f"{loc}: context_topics must be a non-empty list")
-    elif not all(isinstance(t, str) and t.strip() for t in topics):
-        errors.append(f"{loc}: context_topics must be a list of non-empty strings")
-
-    # qa_pairs
+    # qa_pairs — required in both modes
     pairs = entry.get("qa_pairs", None)
     if not isinstance(pairs, list) or len(pairs) == 0:
         errors.append(f"{loc}: qa_pairs must be a non-empty list")
     else:
         for j, qa in enumerate(pairs):
-            errors.extend(_check_qa(loc, j, qa))
+            errors.extend(_check_qa(loc, j, qa, lenient=lenient))
 
     return errors
 
 
-def _check_qa(entry_loc: str, j: int, qa: Any) -> List[str]:
+def _check_qa(entry_loc: str, j: int, qa: Any, lenient: bool = False) -> List[str]:
     errors: List[str] = []
     loc = f"{entry_loc}.qa_pairs[{j}]"
 
     if not isinstance(qa, dict):
         return [f"{loc}: expected object, got {type(qa).__name__}"]
 
-    missing = QA_REQUIRED_KEYS - qa.keys()
-    if missing:
-        errors.append(f"{loc}: missing keys: {sorted(missing)}")
+    if not lenient:
+        missing = QA_REQUIRED_KEYS - qa.keys()
+        if missing:
+            errors.append(f"{loc}: missing keys: {sorted(missing)}")
 
+    # Always-required (training reads these)
     q = qa.get("question", "")
     if not isinstance(q, str) or not q.strip():
         errors.append(f"{loc}: question must be a non-empty string")
@@ -109,24 +125,71 @@ def _check_qa(entry_loc: str, j: int, qa: Any) -> List[str]:
 
     bl = qa.get("bloom_level", None)
     if not isinstance(bl, int) or bl < 1 or bl > 6:
-        errors.append(f"{loc}: bloom_level must be an integer 1–6, got {bl!r}")
+        errors.append(f"{loc}: bloom_level must be an integer 1-6, got {bl!r}")
 
-    diff = qa.get("difficulty", "")
-    if diff not in VALID_DIFFICULTIES:
-        errors.append(f"{loc}: difficulty must be one of {sorted(VALID_DIFFICULTIES)}, got {diff!r}")
+    if not lenient:
+        diff = qa.get("difficulty", "")
+        if diff not in VALID_DIFFICULTIES:
+            errors.append(f"{loc}: difficulty must be one of {sorted(VALID_DIFFICULTIES)}, got {diff!r}")
 
-    bj = qa.get("bloom_justification", "")
-    if not isinstance(bj, str) or not bj.strip():
-        errors.append(f"{loc}: bloom_justification must be a non-empty string")
+        bj = qa.get("bloom_justification", "")
+        if not isinstance(bj, str) or not bj.strip():
+            errors.append(f"{loc}: bloom_justification must be a non-empty string")
 
-    afc = qa.get("answerable_from_context", None)
-    if afc is not True:
-        errors.append(f"{loc}: answerable_from_context must be true")
+        afc = qa.get("answerable_from_context", None)
+        if afc is not True:
+            errors.append(f"{loc}: answerable_from_context must be true")
 
     return errors
 
 
-def validate_file(path: Path) -> Tuple[bool, List[str], Dict[str, Any]]:
+def _load_data(raw: str, lenient: bool) -> Tuple[List[Any], List[str]]:
+    """
+    Parse raw text. In strict mode, demands a proper JSON array.
+    In lenient mode, additionally accepts concatenated/streaming JSON
+    (multiple top-level objects, no wrapping array — the format used by
+    machine-enhanced data files).
+    """
+    if not raw:
+        return [], ["File is empty"]
+
+    if raw.startswith("["):
+        try:
+            data = json.loads(raw)
+            if not isinstance(data, list):
+                return [], ["Top-level structure must be a JSON array"]
+            return data, []
+        except json.JSONDecodeError as e:
+            if not lenient:
+                return [], [f"Invalid JSON: {e}"]
+            # Fall through to streaming parse
+
+    if not lenient:
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as e:
+            return [], [f"Invalid JSON: {e}"]
+        if not isinstance(data, list):
+            return [], ["Top-level structure must be a JSON array"]
+        return data, []
+
+    # Lenient: accept concatenated top-level objects via raw_decode loop
+    decoder = json.JSONDecoder()
+    records, idx = [], 0
+    while idx < len(raw):
+        while idx < len(raw) and raw[idx] in " \t\n\r":
+            idx += 1
+        if idx >= len(raw):
+            break
+        try:
+            obj, idx = decoder.raw_decode(raw, idx)
+        except json.JSONDecodeError as e:
+            return [], [f"Invalid JSON near offset {idx}: {e}"]
+        records.append(obj)
+    return records, []
+
+
+def validate_file(path: Path, lenient: bool = False) -> Tuple[bool, List[str], Dict[str, Any]]:
     """
     Returns (ok, errors, stats).
     stats contains entry_count, total_qa, bloom_distribution, difficulty_distribution.
@@ -138,19 +201,15 @@ def validate_file(path: Path) -> Tuple[bool, List[str], Dict[str, Any]]:
     except OSError as e:
         return False, [f"Cannot read file: {e}"], {}
 
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as e:
-        return False, [f"Invalid JSON: {e}"], {}
-
-    if not isinstance(data, list):
-        return False, ["Top-level structure must be a JSON array"], {}
+    data, load_errors = _load_data(raw, lenient=lenient)
+    if load_errors:
+        return False, load_errors, {}
 
     if len(data) == 0:
-        return False, ["File contains an empty array — no entries found"], {}
+        return False, ["File contains no entries"], {}
 
     for i, entry in enumerate(data):
-        errors.extend(_check_entry(i, entry))
+        errors.extend(_check_entry(i, entry, lenient=lenient))
 
     # Stats (best-effort — computed even if there are errors)
     total_qa = 0
@@ -195,6 +254,12 @@ def parse_args() -> argparse.Namespace:
         "--client", action="append", metavar="ID:DATA_PATH",
         help="Alternative spec: 'id:path/to/data.json'",
     )
+    p.add_argument(
+        "--lenient", action="store_true",
+        help="Lenient mode for machine-enhanced data: accepts concatenated JSON "
+             "(multiple top-level objects) and only validates fields the training "
+             "code actually consumes.",
+    )
     return p.parse_args()
 
 
@@ -215,12 +280,15 @@ def main() -> None:
         sys.exit(2)
 
     all_ok = True
+    if args.lenient:
+        print(f"[lenient mode] Validating only fields used by training; "
+              f"accepting concatenated JSON.")
     for path in paths:
         print(f"\n{'='*60}")
         print(f"Validating: {path}")
         print(f"{'='*60}")
 
-        ok, errors, stats = validate_file(path)
+        ok, errors, stats = validate_file(path, lenient=args.lenient)
 
         if stats:
             print(f"  Entries       : {stats['entries']}")
