@@ -8,6 +8,9 @@ openai_api_key.txt
 .env
 **/.env
 
+# Personally-identifiable participant info — keep local only
+PARTICIPANTS.md
+
 # Python
 __pycache__/
 *.py[cod]
