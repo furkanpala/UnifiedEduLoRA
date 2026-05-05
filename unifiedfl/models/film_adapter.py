@@ -46,15 +46,24 @@ try:
 except ImportError:
     MarianEncoderLayer = MarianDecoderLayer = None  # type: ignore[assignment,misc]
 
+try:
+    from transformers.models.prophetnet.modeling_prophetnet import (
+        ProphetNetEncoderLayer,
+        ProphetNetDecoderLayer,
+    )
+except ImportError:
+    ProphetNetEncoderLayer = ProphetNetDecoderLayer = None  # type: ignore[assignment,misc]
+
 _FAMILY_TARGETS: Dict[str, Tuple[type, ...]] = {}
 
 def _build_family_targets() -> None:
     for key, types in [
-        ("t5",        [T5Block]),
-        ("bart",      [BartEncoderLayer, BartDecoderLayer]),
-        ("led",       [LEDEncoderLayer, LEDDecoderLayer]),
-        ("pegasus_x", [PegasusXEncoderLayer, PegasusXDecoderLayer]),
-        ("marian",    [MarianEncoderLayer, MarianDecoderLayer]),
+        ("t5",         [T5Block]),
+        ("bart",       [BartEncoderLayer, BartDecoderLayer]),
+        ("led",        [LEDEncoderLayer, LEDDecoderLayer]),
+        ("pegasus_x",  [PegasusXEncoderLayer, PegasusXDecoderLayer]),
+        ("marian",     [MarianEncoderLayer, MarianDecoderLayer]),
+        ("prophetnet", [ProphetNetEncoderLayer, ProphetNetDecoderLayer]),
     ]:
         valid = tuple(t for t in types if t is not None)
         if valid:

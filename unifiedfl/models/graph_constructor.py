@@ -77,6 +77,18 @@ try:
 except ImportError:  # pragma: no cover
     MarianAttention = MarianEncoderLayer = MarianDecoderLayer = None  # type: ignore[assignment,misc]
 
+try:
+    from transformers.models.prophetnet.modeling_prophetnet import (
+        ProphetNetAttention,
+        ProphetNetNgramSelfAttention,
+        ProphetNetEncoderLayer,
+        ProphetNetDecoderLayer,
+        ProphetNetFeedForward,
+    )
+except ImportError:  # pragma: no cover
+    ProphetNetAttention = ProphetNetNgramSelfAttention = None  # type: ignore[assignment,misc]
+    ProphetNetEncoderLayer = ProphetNetDecoderLayer = ProphetNetFeedForward = None  # type: ignore[assignment,misc]
+
 logger = logging.getLogger("federated_qa")
 
 # ── Layer-type ID mapping ────────────────────────────────────────────────────
@@ -92,6 +104,9 @@ def _build_type_map() -> Dict[type, int]:
         (PegasusXAttention, 17), (PegasusXEncoderLayer, 18), (PegasusXDecoderLayer, 19),
         (PegasusXEncoderEphemeralLayer, 20),
         (MarianAttention, 21), (MarianEncoderLayer, 22), (MarianDecoderLayer, 23),
+        (ProphetNetAttention, 24), (ProphetNetNgramSelfAttention, 25),
+        (ProphetNetEncoderLayer, 26), (ProphetNetDecoderLayer, 27),
+        (ProphetNetFeedForward, 28),
     ]:
         if cls is not None:
             mapping[cls] = tid
