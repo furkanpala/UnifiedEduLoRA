@@ -5,6 +5,21 @@ from typing import List, Optional
 
 import torch
 import torch.nn as nn
+
+# Force-import torch.distributed.tensor so PEFT's DTensor isinstance check
+# can resolve at LoRA-injection time. PEFT >= 0.13 unconditionally references
+# torch.distributed.tensor.DTensor inside _get_in_out_features when its
+# _torch_supports_distributed flag is True, but does NOT import the submodule
+# itself — and the submodule is not auto-loaded on every torch build (notably
+# CPU-only builds), so peft can crash with
+#   AttributeError: module 'torch.distributed' has no attribute 'tensor'
+# the first time we call get_peft_model. Importing it eagerly here populates
+# the attribute path safely.
+try:
+    import torch.distributed.tensor  # noqa: F401
+except ImportError:
+    pass
+
 from peft import LoraConfig, TaskType, get_peft_model
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, LEDForConditionalGeneration
 
@@ -64,6 +79,20 @@ class ClientModel(nn.Module):
         )
         self.model = get_peft_model(base_model, lora_cfg)
         self.model.to(device)
+
+        # Disable gradient checkpointing if the base model has it enabled.
+        # Some models (notably ProphetNet) ship with gradient_checkpointing=True
+        # in their config. Checkpointing replays forward passes during backward,
+        # which is incompatible with our FiLM forward-hook design — each hook
+        # would fire again with stale GNN-derived state. Mixed-precision
+        # (BF16) gives us the memory savings we'd otherwise need checkpointing for.
+        if hasattr(self.model, "gradient_checkpointing_disable"):
+            try:
+                self.model.gradient_checkpointing_disable()
+            except (ValueError, AttributeError):
+                # Some PEFT/transformers versions raise if checkpointing was
+                # never enabled in the first place — that's fine.
+                pass
 
         # Detect LED
         try:
