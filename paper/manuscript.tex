@@ -34,6 +34,7 @@
 
 % ── Layout helpers ────────────────────────────────────────────
 \usepackage{booktabs}
+\usepackage{multirow}
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{algorithm}
@@ -1916,10 +1917,13 @@ in AI-powered education.
   structure. We have not measured how much signal is
   lost relative to a finer-grained graph.
   \item \textbf{Encoder-decoder family only.} The
-  current experiments cover T5, BART, and LED.
-  Decoder-only causal LMs are supported in principle
-  (FiLM hooks would attach to causal blocks
-  identically) but are not exercised in this paper.
+  current experiments cover five encoder-decoder
+  SLMs: BART-base, Flan-T5-base, LED-base-16384,
+  Pegasus-X-base, and ProphetNet-large. Decoder-only
+  causal LMs (Phi-3, Gemma, Llama-3, Mistral) are
+  supported in principle --- FiLM hooks would attach
+  to causal blocks identically --- but are not
+  exercised in this paper.
   \red{TODO: confirm whether to claim decoder-only
   support or scope strictly to encoder-decoder.}
   \item \textbf{Bloom's labels and LLM judges.} The
@@ -1931,11 +1935,13 @@ in AI-powered education.
   subset (§\ref{sec:pedagogical}), but the metrics
   remain proxies for pedagogical value rather than
   direct measurements of student outcomes.
-  \item \textbf{Federation scale.} The empirical study
-  involves three institutions. Larger federations
-  ($m \geq 10$) would test whether GAT averaging
-  scales gracefully under more diverse architecture
-  distributions; we leave this to future work.
+  \item \textbf{Federation scale.} The empirical
+  study involves three institutions in the public
+  testbed and five in the private testbed. Larger
+  federations ($m \geq 10$) would test whether GAT
+  averaging scales gracefully under more diverse
+  architecture distributions; we leave this to
+  future work.
   \item \textbf{Compute and API budget.} The full
   evaluation suite invokes GPT-4o for the LLM judge,
   the Bloom's LLM judge, and the LLM equity judge,
@@ -1949,8 +1955,10 @@ in AI-powered education.
 \section*{Acknowledgments}
 
 \red{TODO: institutional / compute / funding
-acknowledgments; thanks to the three collaborating
-institutions for their participation; etc.}
+acknowledgments; thanks to the public-testbed source
+materials (MIT 18.657, Stanford CS229, arXiv) and
+the five collaborating institutions of the private
+testbed for their participation; etc.}
 
 %% ════════════════════════════════════════════════════════════
 % Custom bibliography only (no Anthology). Switch to
