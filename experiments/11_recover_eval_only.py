@@ -86,6 +86,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lora-dropout", type=float, default=0.1)
 
     # Generation / eval — keep defaults aligned with train_client.py
+    p.add_argument("--batch-size",                type=int,   default=4,
+                   help="Batch size used by _evaluate during generation. "
+                        "Same default as train_client.py.")
     p.add_argument("--max-input-len",             type=int,   default=512)
     p.add_argument("--max-target-len",            type=int,   default=128)
     p.add_argument("--eval-num-return-sequences", type=int,   default=5)
