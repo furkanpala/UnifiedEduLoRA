@@ -34,6 +34,17 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--splits-dir",  required=True)
     p.add_argument("--output-dir",  required=True)
+    p.add_argument("--fold", type=int, default=0, choices=[0, 1, 2, 3],
+                   help="If >=1, use the fold-specific splits produced by "
+                        "experiments/02_split_3fold.py (matches the individual "
+                        "experiment's split layout). 0 = legacy flat layout.")
+    p.add_argument("--conditioning", default="topic",
+                   choices=["baseline", "topic", "bloom"],
+                   help="Prompt conditioning used for both training and eval.")
+    p.add_argument("--snapshot-metric", choices=["rouge_l", "val_loss"],
+                   default="rouge_l",
+                   help="Metric used to pick the best snapshot. rouge_l matches "
+                        "train_client.py's early-stop metric.")
 
     # Federation
     p.add_argument("--num-rounds",   type=int, default=33)
@@ -86,7 +97,9 @@ def main() -> None:
         "python", "-u", train_script,
         "--splits-dir",             args.splits_dir,
         "--output-dir",             args.output_dir,
-        "--conditioning",           "topic",
+        "--fold",                   str(args.fold),
+        "--conditioning",           args.conditioning,
+        "--snapshot-metric",        args.snapshot_metric,
         "--no-qual-eval",           # qualitative eval less meaningful with topic conditioning
         "--num-rounds",             str(args.num_rounds),
         "--local-epochs",           str(args.local_epochs),
