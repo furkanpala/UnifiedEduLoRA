@@ -498,9 +498,24 @@ Send both `summary_*.json` files and the entire `outputs/` directory back to the
 
 ### Resuming After a Colab Disconnect
 
-The orchestrator is resume-friendly: re-run the same `experiments/03_run_three_conditionings.py` command and it will skip any (conditioning, fold) pair whose `metrics_val.json` already exists. To force re-running a specific subset, add `--force` and (optionally) `--conditionings <name>` / `--folds N`.
+Three resume scenarios, in order of granularity:
 
-For mid-fold resume, `train_client.py` directly supports `--resume-from-epoch N` — it reloads the checkpoint at `outputs/<conditioning>/client_<N>/fold<k>/checkpoints/epoch_N/` and continues from epoch N+1, preserving the early-stopping state and best checkpoint.
+**1. Orchestrator-level (most common)** — re-run the same `experiments/03_run_three_conditionings.py` command and it will skip any (conditioning, fold) pair whose `results/best/metrics_val.json` already exists. To force re-running a specific subset, add `--force` and (optionally) `--conditionings <name>` / `--folds N`.
+
+**2. Mid-fold resume** — `train_client.py` directly supports `--resume-from-epoch N`. It reloads the checkpoint at `outputs/<conditioning>/client_<N>/fold<k>/checkpoints/epoch_N/` and continues from epoch N+1, preserving the early-stopping state and best checkpoint.
+
+**3. Eval-only resume** — if training finished and the `best/lora_model/` + `final/lora_model/` adapters are on disk but the eval block crashed (e.g. comprehensive eval OOMed, Colab session died during the OpenAI-judge calls), use `experiments/11_recover_eval_only.py`. It re-runs only the post-training eval on the saved adapters and writes the missing `results/{best,final}/metrics_val.json`. Without this you'd otherwise re-train the fold from scratch because the orchestrator's skip-check looks for `metrics_val.json`, not the adapter directories.
+
+```bash
+python experiments/11_recover_eval_only.py \
+    --output-dir   /content/drive/MyDrive/unifiedfl/outputs \
+    --splits-dir   /content/drive/MyDrive/unifiedfl/outputs/splits \
+    --client-id    <id> --fold <k> --conditioning <baseline|topic|bloom> \
+    --model <model> --family <family> --targets <targets...>
+# Auto-skips a side that already has metrics_val.json; pass --skip-best
+# or --skip-final to force-skip one. Add --no-heavy to disable
+# UnifiedQA + DeBERTa metrics for a faster recovery.
+```
 
 ---
 
@@ -527,16 +542,26 @@ unifiedfl/
 └── utils/                    ← logging utilities
 
 experiments/                  ← experiment orchestrators (sit on top of train_client.py / train_federated.py)
-├── 01_enhance_mit_data.py             ← GPT-4o-mini enhances raw MIT data with question_topic + bloom_level
-├── 02_split_3fold.py                  ← per-client 3-fold CV split (single-dataset MIT experiment)
-├── 03_run_three_conditionings.py      ← Phase 2 orchestrator: 3 conditionings × 3 folds = 9 trainings
-├── 04_aggregate_results.py            ← per-client summary table (best or final checkpoint)
-├── 05_enhance_all_datasets.py         ← enhances MIT, Stanford, Papers in one pass
-├── 06_split_fed_experiment.py         ← single-split (80/10/10) for the 3-client federated experiment
+├── 01_enhance_mit_data.py                  ← GPT-4o-mini enhances raw MIT data with question_topic + bloom_level
+├── 02_split_3fold.py                       ← per-client 3-fold CV split (single-dataset MIT experiment)
+├── 03_run_three_conditionings.py           ← Phase 2 orchestrator: 3 conditionings × 3 folds = 9 trainings
+├── 04_aggregate_results.py                 ← per-client summary table (best or final checkpoint)
+├── 05_enhance_all_datasets.py              ← enhances MIT, Stanford, Papers in one pass
+├── 06_split_fed_experiment.py              ← single-split (80/10/10) for the 3-client federated experiment
 ├── 07_run_individual_baselines_fed_exp.py  ← individual baselines for the federated comparison
-├── 08_run_federated_training.py       ← train_federated.py wrapper with the federated-experiment defaults
-├── 09_compare_results.py              ← individual-vs-federated comparison table
-└── 10_eval_checkpoint.py              ← evaluate any federated checkpoint and save metrics for comparison
+├── 08_run_federated_training.py            ← train_federated.py wrapper with the federated-experiment defaults
+├── 09_compare_results.py                   ← individual-vs-federated comparison table
+├── 10_eval_checkpoint.py                   ← evaluate any federated checkpoint and save metrics for comparison
+├── 11_recover_eval_only.py                 ← re-run only the post-train eval on saved best+final adapters (Phase 2 recovery)
+└── quick_summary.py                        ← per-fold + best-vs-final analysis helper for the 3-conditioning x 3-fold tree
+
+tests/                        ← pytest suite (run with `pytest tests/` — 64 tests, CPU-only, no model downloads)
+├── test_metrics_helpers.py            ← parse_qa, token_f1, cosine, sanitize_json_escapes
+├── test_dataset.py                    ← render_prompt edge cases + label -100 invariant
+├── test_gnn.py                        ← ArchitectureGNN forward / grad / shape invariants
+├── test_federated_server.py           ← weighted FedAvg correctness
+├── test_split_3fold.py                ← CV fold disjointness + reproducibility
+└── test_orchestrator_defaults.py      ← regression guard: orchestrator defaults must match train_client + no .load_adapter() calls
 
 infer.py                      ← student-facing inference: load a saved checkpoint, generate QA from a context
 ```
