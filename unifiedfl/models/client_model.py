@@ -31,7 +31,9 @@ class ClientModel(nn.Module):
     Wraps a HuggingFace Seq2Seq LM with LoRA adapters via PEFT.
 
     Base model weights are fully frozen; only LoRA adapter weights are
-    trainable. Models are loaded in FP16 to save GPU memory.
+    trainable. The base model is loaded in FP32 (FP16 attention overflows
+    on T5 before padding masks are applied); BF16 autocast in the trainer
+    handles the mixed-precision path on hardware that supports it.
 
     LED-specific handling:
         - global_attention_mask (attention on first token) is added

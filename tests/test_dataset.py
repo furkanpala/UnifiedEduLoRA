@@ -52,6 +52,21 @@ class TestRenderPrompt:
         p = render_prompt({"context": "ctx"}, "bloom")
         assert "Level-2" in p
 
+    def test_bloom_level_empty_string_falls_back_to_default(self):
+        # split.py:88 inserts bloom_level="" when the source qa_pair lacks the
+        # field (pre-enrichment data). render_prompt must NOT crash with
+        # int("") on this — the bug class is "ValueError mid-training run on
+        # the very first batch when --conditioning bloom is used against
+        # un-enriched data." Falls back to default level=2 instead.
+        p = render_prompt({"context": "ctx", "bloom_level": ""}, "bloom")
+        assert "Level-2" in p
+
+    def test_bloom_level_non_int_string_falls_back_to_default(self):
+        # If the source data carries a textual bloom level (e.g. "understand"),
+        # we silently fall back to the default rather than crash.
+        p = render_prompt({"context": "ctx", "bloom_level": "understand"}, "bloom")
+        assert "Level-2" in p
+
     def test_unknown_conditioning_raises(self):
         with pytest.raises(ValueError):
             render_prompt({"context": "ctx"}, "totally_made_up")

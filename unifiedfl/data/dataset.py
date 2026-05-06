@@ -52,9 +52,19 @@ def render_prompt(sample: Dict[str, object], conditioning: str) -> str:
         )
     # bloom: clamp to [1, 6]. Use `is None` rather than truthiness so that an
     # explicit bloom_level=0 (which is out-of-range) gets clamped to 1 instead
-    # of being silently replaced by the default of 2.
+    # of being silently replaced by the default of 2. Empty strings (the
+    # default split.py inserts when the source qa_pair lacks the field — i.e.
+    # pre-enrichment data) and other non-int junk also fall back to default 2
+    # so this doesn't crash mid-train; run experiments/05_enhance_all_datasets.py
+    # to get real bloom labels before relying on this conditioning.
     raw = sample.get("bloom_level")
-    level = 2 if raw is None else int(raw)
+    if raw is None or raw == "":
+        level = 2
+    else:
+        try:
+            level = int(raw)
+        except (TypeError, ValueError):
+            level = 2
     level = max(1, min(6, level))
     return template.format(
         context=sample["context"],
