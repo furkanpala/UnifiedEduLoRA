@@ -58,7 +58,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lr",               type=float, default=3e-4)
     p.add_argument("--patience",         type=int,   default=10)
     p.add_argument("--preview-every",    type=int,   default=0)
-    p.add_argument("--checkpoint-every", type=int,   default=0)
+    p.add_argument("--checkpoint-every", type=int,   default=5,
+                   help="Save a full LoRA + optimizer + scheduler checkpoint "
+                        "every N epochs (matches train_client.py default). "
+                        "Pass 0 to disable periodic checkpointing.")
     p.add_argument("--fast-eval",        action="store_true",
                    help="Skip heavy (UnifiedQA/DeBERTa) and LLM-based metrics. "
                         "Default: comprehensive evaluation (requires OpenAI key for "
