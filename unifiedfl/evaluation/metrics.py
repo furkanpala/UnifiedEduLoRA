@@ -622,11 +622,11 @@ def compute_blooms_llm(
             raw = _sanitize_json_escapes(raw)
             parsed = json.loads(raw)
             level  = int(parsed["level"])
+            level  = max(1, min(6, level))
             reason = parsed.get("reason", "")
             evs    = (level - 1) / 5.0
             per_sample.append({"level": level, "reason": reason, "evs": evs})
-            if 1 <= level <= 6:
-                distribution[level] += 1
+            distribution[level] += 1
         except Exception as e:
             logger.warning(f"Bloom's LLM judge failed for question: {e}")
             per_sample.append({"level": None, "reason": str(e), "evs": None})

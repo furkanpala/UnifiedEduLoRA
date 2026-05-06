@@ -58,8 +58,14 @@ class FederatedClient:
     # ── GNN federation interface ──────────────────────────────────────────────
 
     def get_gnn_state_dict(self) -> Dict[str, torch.Tensor]:
-        """Return GNN parameters on CPU for aggregation."""
-        return {k: v.detach().cpu() for k, v in self.gnn.state_dict().items()}
+        """Return a CPU copy of GNN parameters for aggregation.
+
+        .clone() ensures the returned tensors don't share storage with the
+        live module — without it, in-place ops on the live params (e.g. in
+        the next training step) would mutate the snapshot the server is
+        about to aggregate.
+        """
+        return {k: v.detach().cpu().clone() for k, v in self.gnn.state_dict().items()}
 
     def load_gnn_state_dict(self, state_dict: Dict[str, torch.Tensor]) -> None:
         """Load aggregated GNN parameters from the server."""

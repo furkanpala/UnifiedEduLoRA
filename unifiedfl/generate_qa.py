@@ -203,6 +203,11 @@ def generate_qa_for_context(
             raw = resp.choices[0].message.content.strip()
             raw = re.sub(r"^```(?:json)?\s*", "", raw)
             raw = re.sub(r"\s*```$", "", raw)
+            # GPT occasionally emits raw backslashes in math notation
+            # (e.g. \alpha, \lambda) that are not valid JSON escapes — same
+            # sanitizer used in evaluation/metrics.py.
+            from evaluation.metrics import _sanitize_json_escapes
+            raw = _sanitize_json_escapes(raw)
 
             parsed = json.loads(raw)
             if not isinstance(parsed, dict):

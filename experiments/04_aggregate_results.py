@@ -107,7 +107,9 @@ def main() -> None:
         print()
 
     if args.save_summary:
-        Path(args.save_summary).write_text(json.dumps(rows, indent=2))
+        Path(args.save_summary).write_text(
+            json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8",
+        )
         print(f"Per-fold metrics saved to {args.save_summary}")
 
 

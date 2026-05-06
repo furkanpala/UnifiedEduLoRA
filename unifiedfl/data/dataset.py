@@ -40,6 +40,8 @@ BLOOM_VERBS: Dict[int, str] = {
 
 def render_prompt(sample: Dict[str, object], conditioning: str) -> str:
     """Render the prompt for a sample under a given conditioning mode."""
+    if conditioning not in PROMPT_TEMPLATES:
+        raise ValueError(f"Unknown conditioning: {conditioning!r}")
     template = PROMPT_TEMPLATES[conditioning]
     if conditioning == "baseline":
         return template.format(context=sample["context"])
@@ -48,15 +50,17 @@ def render_prompt(sample: Dict[str, object], conditioning: str) -> str:
             context=sample["context"],
             question_topic=sample.get("question_topic") or "the main topic",
         )
-    if conditioning == "bloom":
-        level = int(sample.get("bloom_level") or 2)
-        level = max(1, min(6, level))
-        return template.format(
-            context=sample["context"],
-            bloom_level=level,
-            bloom_verb=BLOOM_VERBS[level],
-        )
-    raise ValueError(f"Unknown conditioning: {conditioning!r}")
+    # bloom: clamp to [1, 6]. Use `is None` rather than truthiness so that an
+    # explicit bloom_level=0 (which is out-of-range) gets clamped to 1 instead
+    # of being silently replaced by the default of 2.
+    raw = sample.get("bloom_level")
+    level = 2 if raw is None else int(raw)
+    level = max(1, min(6, level))
+    return template.format(
+        context=sample["context"],
+        bloom_level=level,
+        bloom_verb=BLOOM_VERBS[level],
+    )
 
 
 class QADataset(Dataset):

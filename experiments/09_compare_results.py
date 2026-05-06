@@ -189,7 +189,10 @@ def main() -> None:
             )
 
     if args.save:
-        Path(args.save).write_text(json.dumps(comparison, indent=2, default=str))
+        Path(args.save).write_text(
+            json.dumps(comparison, indent=2, default=str, ensure_ascii=False),
+            encoding="utf-8",
+        )
         print(f"\nComparison saved → {args.save}")
 
 

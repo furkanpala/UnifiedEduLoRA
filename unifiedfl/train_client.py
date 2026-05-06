@@ -543,7 +543,9 @@ def _run_full_eval(
     )
 
     metrics_path = out_dir / f"metrics_{split_name}.json"
-    metrics_path.write_text(json.dumps(metrics, indent=2))
+    metrics_path.write_text(
+        json.dumps(metrics, indent=2, ensure_ascii=False), encoding="utf-8",
+    )
     print(f"  Metrics saved → {metrics_path}")
 
     qa_records = [

@@ -148,13 +148,13 @@ def main() -> None:
 
         if (entry_idx + 1) % args.save_every == 0:
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(json.dumps(enhanced, indent=2, ensure_ascii=False))
+            out_path.write_text(json.dumps(enhanced, indent=2, ensure_ascii=False), encoding="utf-8")
             print(f"  enhanced {entry_idx + 1}/{len(raw)} entries — "
                   f"{qas_done}/{n_qas_total} QAs ({qas_called} new API calls so far)",
                   flush=True)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(enhanced, indent=2, ensure_ascii=False))
+    out_path.write_text(json.dumps(enhanced, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\nDone. Enhanced file saved to {out_path}")
     print(f"  total entries:           {len(enhanced)}")
     print(f"  total QA pairs:          {sum(len(e.get('qa_pairs', [])) for e in enhanced)}")

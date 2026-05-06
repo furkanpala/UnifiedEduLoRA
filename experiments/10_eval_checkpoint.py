@@ -251,11 +251,14 @@ def main() -> None:
 
     # Save in the same format as train_federated.py's final_metrics_per_client.json
     out_path = output_dir / "final_metrics_per_client.json"
-    out_path.write_text(json.dumps({
-        "checkpoint":         str(checkpoint_dir),
-        "label":              args.label,
-        "per_client_metrics": {str(cid): v for cid, v in eval_results.items()},
-    }, indent=2))
+    out_path.write_text(
+        json.dumps({
+            "checkpoint":         str(checkpoint_dir),
+            "label":              args.label,
+            "per_client_metrics": {str(cid): v for cid, v in eval_results.items()},
+        }, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
     print(f"\nMetrics saved → {out_path}")
     print(f"\nNow compare against the individual baseline with:")
     print(f"  python experiments/09_compare_results.py \\")

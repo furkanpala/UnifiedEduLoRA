@@ -198,17 +198,21 @@ class LocalTrainer:
         """Compute mean cross-entropy loss on the validation set."""
         client.client_model.model.eval()
         losses: List[float] = []
-        for batch in val_loader:
-            input_ids = batch["input_ids"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
-            labels = batch["labels"].to(device)
+        try:
+            for batch in val_loader:
+                input_ids = batch["input_ids"].to(device)
+                attention_mask = batch["attention_mask"].to(device)
+                labels = batch["labels"].to(device)
 
-            with torch.amp.autocast("cuda", enabled=use_amp, dtype=torch.bfloat16):
-                outputs = client.client_model.forward(
-                    input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    labels=labels,
-                )
-            losses.append(outputs.loss.item())
-        client.client_model.model.train()
+                with torch.amp.autocast("cuda", enabled=use_amp, dtype=torch.bfloat16):
+                    outputs = client.client_model.forward(
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                        labels=labels,
+                    )
+                losses.append(outputs.loss.item())
+        finally:
+            # Always restore train mode, even if forward raised — otherwise the
+            # next training epoch starts with eval-mode dropout/BN.
+            client.client_model.model.train()
         return sum(losses) / max(len(losses), 1)

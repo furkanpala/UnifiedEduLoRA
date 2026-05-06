@@ -241,7 +241,9 @@ def main() -> None:
             {"conditioning": c, "checkpoint": k, "fold": f, **m}
             for (c, k, f), m in raw.items()
         ]
-        Path(args.save).write_text(json.dumps(flat, indent=2))
+        Path(args.save).write_text(
+            json.dumps(flat, indent=2, ensure_ascii=False), encoding="utf-8",
+        )
         print(f"\nSaved {len(flat)} cells to {args.save}")
 
 

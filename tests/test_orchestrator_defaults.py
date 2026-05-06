@@ -20,7 +20,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent
+REPO = Path(__file__).resolve().parent.parent
 
 
 def _load_module_from_path(path: Path, name: str):
@@ -144,7 +144,7 @@ def _check_no_load_adapter_calls() -> list[str]:
     return failures
 
 
-def main() -> int:
+def _load_all():
     train_client = _load_module_from_path(
         REPO / "unifiedfl" / "train_client.py", "train_client"
     )
@@ -154,16 +154,39 @@ def main() -> int:
     orch_07 = _load_module_from_path(
         REPO / "experiments" / "07_run_individual_baselines_fed_exp.py", "orch_07"
     )
-
     tc_args = _parse_with_argv(train_client.parse_args, TRAIN_CLIENT_REQUIRED)
     a03    = _parse_with_argv(orch_03.parse_args,    ORCH_03_REQUIRED)
     a07    = _parse_with_argv(orch_07.parse_args,    ORCH_07_REQUIRED)
+    return tc_args, a03, a07
 
+
+# ── pytest entry points ──────────────────────────────────────────────────────
+
+def test_03_passthrough_defaults_match_train_client():
+    tc_args, a03, _ = _load_all()
+    fails = _check_one("03 vs train_client", a03, tc_args, PASSTHROUGHS_03, "orch_03")
+    assert not fails, "\n".join(fails)
+
+
+def test_07_passthrough_defaults_match_train_client():
+    tc_args, _, a07 = _load_all()
+    fails = _check_one("07 vs train_client", a07, tc_args, PASSTHROUGHS_07, "orch_07")
+    assert not fails, "\n".join(fails)
+
+
+def test_no_load_adapter_calls_in_unifiedfl():
+    fails = _check_no_load_adapter_calls()
+    assert not fails, "\n".join(fails)
+
+
+# ── script entry point (legacy `python tests/test_orchestrator_defaults.py`) ─
+
+def main() -> int:
+    tc_args, a03, a07 = _load_all()
     failures: list[str] = []
     failures += _check_one("03 vs train_client", a03, tc_args, PASSTHROUGHS_03, "orch_03")
     failures += _check_one("07 vs train_client", a07, tc_args, PASSTHROUGHS_07, "orch_07")
     failures += _check_no_load_adapter_calls()
-
     if failures:
         print("\nFAILURES:")
         for f in failures:

@@ -261,13 +261,16 @@ def main() -> None:
             "top_k": args.top_k,
             "temperature": args.temperature,
         })
-    out_metrics.write_text(json.dumps({
-        **cfg,
-        "n_unique_contexts": len(groups),
-        "mean_distinct_generations": float(np.mean(distinct_counts)),
-        "matching": "hungarian_max_rougeL",
-        **new_metrics,
-    }, indent=2))
+    out_metrics.write_text(
+        json.dumps({
+            **cfg,
+            "n_unique_contexts": len(groups),
+            "mean_distinct_generations": float(np.mean(distinct_counts)),
+            "matching": "hungarian_max_rougeL",
+            **new_metrics,
+        }, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
     print(f"\n  metrics saved → {out_metrics}")
 
     out_qa = fold_dir / f"generated_qas_val_{args.output_suffix}.json"
