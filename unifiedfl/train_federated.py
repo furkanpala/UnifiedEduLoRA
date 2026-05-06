@@ -136,11 +136,8 @@ def _run_comprehensive_eval_per_client(
             evaluator._deactivate_hooks(client)
 
 
-def set_seeds(seed: int) -> None:
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+# Centralized in utils.reproducibility — same setup as train_client.py.
+from utils.reproducibility import set_seeds  # noqa: F401
 
 
 def parse_args() -> argparse.Namespace:

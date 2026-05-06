@@ -65,11 +65,10 @@ def _ensure_nltk_punkt() -> None:
                 continue
 
 
-def set_seeds(seed: int) -> None:
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+# Centralized in utils.reproducibility so individual / federated / main share
+# the exact same seeding + deterministic-CUDA setup. Re-exported here because
+# experiments/11_recover_eval_only.py imports it from this module.
+from utils.reproducibility import set_seeds  # noqa: F401
 
 
 def parse_args() -> argparse.Namespace:

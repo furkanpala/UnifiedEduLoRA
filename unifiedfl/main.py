@@ -51,13 +51,9 @@ from utils.logging_utils import (
 # Seed & device helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def set_seeds(seed: int) -> None:
-    """Set all random seeds for reproducibility."""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
+# Centralized in utils.reproducibility — same setup as train_client.py /
+# train_federated.py.
+from utils.reproducibility import set_seeds  # noqa: F401
 
 
 def get_device(preferred: str) -> torch.device:
