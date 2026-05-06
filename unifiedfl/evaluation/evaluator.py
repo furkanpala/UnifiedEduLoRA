@@ -246,14 +246,21 @@ class Evaluator:
     def _deactivate_hooks(self, client: Any) -> None:
         client.film_adapter.remove_hooks()
 
-    def _evaluate_on_samples(
+    def collect_predictions(
         self,
         client: Any,
         samples: List[Dict[str, str]],
-    ) -> Dict[str, float]:
-        """Generate predictions for `samples` and compute all metrics."""
+    ) -> tuple:
+        """
+        Generate predictions for `samples` (FiLM hooks must already be
+        active — see _activate_hooks). Returns (preds, refs, contexts).
+
+        contexts are the raw 'context' fields from samples, in the same order
+        as preds — required by compute_comprehensive_metrics for RTC,
+        Faithfulness, QAFactEval, RQUGE.
+        """
         if not samples:
-            return {"rouge_l": 0.0, "bleu_4": 0.0, "bertscore_f1": 0.0}
+            return [], [], []
 
         tokenizer = client.client_model.tokenizer
         dataset = QADataset(
@@ -297,4 +304,17 @@ class Evaluator:
                 label_ids = label_ids.masked_fill(label_ids == -100, tokenizer.pad_token_id)
                 references.append(tokenizer.decode(label_ids, skip_special_tokens=True))
 
-        return compute_all_metrics(predictions, references, self.device)
+        contexts = [s.get("context", "") for s in samples]
+        return predictions, references, contexts
+
+    def _evaluate_on_samples(
+        self,
+        client: Any,
+        samples: List[Dict[str, str]],
+    ) -> Dict[str, float]:
+        """Generate predictions for `samples` and compute the lightweight
+        3-metric combo (ROUGE-L / BLEU-4 / BERTScore)."""
+        if not samples:
+            return {"rouge_l": 0.0, "bleu_4": 0.0, "bertscore_f1": 0.0}
+        preds, refs, _ = self.collect_predictions(client, samples)
+        return compute_all_metrics(preds, refs, self.device)

@@ -42,7 +42,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from config.config import Config, ClientConfig, LoRAConfig, GNNConfig, FiLMConfig
 from data.dataset import render_prompt
 from evaluation.evaluator import Evaluator
-from evaluation.metrics import compute_all_metrics
+from evaluation.metrics import compute_all_metrics, compute_comprehensive_metrics
 from federation.client import FederatedClient
 from federation.server import FederatedServer
 from models.client_model import ClientModel
@@ -51,6 +51,89 @@ from models.gnn import ArchitectureGNN
 from models.graph_constructor import build_graph, refresh_graph_features
 from training.trainer import LocalTrainer
 from utils.logging_utils import JSONLogger, setup_logging
+
+
+def _ensure_nltk_punkt() -> None:
+    """Mirror of train_client._ensure_nltk_punkt — needed because
+    compute_faithfulness / compute_qafacteval call nltk.sent_tokenize."""
+    import nltk
+    for pkg in ("punkt_tab", "punkt"):
+        try:
+            nltk.data.find(f"tokenizers/{pkg}")
+            return
+        except LookupError:
+            try:
+                nltk.download(pkg, quiet=True)
+                return
+            except Exception:
+                continue
+
+
+def _run_comprehensive_eval_per_client(
+    clients: list,
+    evaluator: Evaluator,
+    output_dir: Path,
+    label: str,                 # "best" or "final"
+    args: argparse.Namespace,
+    device: torch.device,
+    global_test: list,
+) -> None:
+    """
+    Run compute_comprehensive_metrics for each client on its local test set
+    and (if available) the global test set. Writes one JSON per (client,
+    split) into {output_dir}/results/{label}/client_{cid}_metrics_{split}.json.
+
+    Mirrors the dual best/final pattern in train_client.py.
+    """
+    results_dir = output_dir / "results" / label
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"\n{'=' * 60}")
+    print(f"  Comprehensive evaluation [{label} state]")
+    print(f"{'=' * 60}")
+
+    for client in clients:
+        cid = client.client_id
+        print(f"\n  Client {cid} ({client.client_model.model_name}) …")
+        evaluator._activate_hooks(client)
+        try:
+            for split_name, samples in (("test",        client.test_samples),
+                                         ("global_test", global_test)):
+                if not samples:
+                    continue
+                print(f"    [{split_name}] generating on {len(samples)} samples …")
+                preds, refs, contexts = evaluator.collect_predictions(client, samples)
+
+                # Free the LM from GPU before loading the heavy metric models
+                # (UnifiedQA, DeBERTa NLI). Mirrors train_client._run_full_eval.
+                if device.type == "cuda":
+                    client.client_model.model.to("cpu")
+                    import gc
+                    gc.collect()
+                    torch.cuda.empty_cache()
+
+                metrics = compute_comprehensive_metrics(
+                    generated=preds,
+                    references=refs,
+                    contexts=contexts,
+                    device=device,
+                    openai_api_key=args.openai_api_key,
+                    run_heavy=not args.no_heavy,
+                    blooms_model=args.blooms_model or None,
+                )
+                out_path = (results_dir
+                            / f"client_{cid}_metrics_{split_name}.json")
+                out_path.write_text(
+                    json.dumps(metrics, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                print(f"    [{split_name}] saved → {out_path}")
+
+                # Move LM back for the next iteration
+                if device.type == "cuda":
+                    client.client_model.model.to(device)
+        finally:
+            evaluator._deactivate_hooks(client)
 
 
 def set_seeds(seed: int) -> None:
@@ -139,6 +222,24 @@ def parse_args() -> argparse.Namespace:
                    help="Root output dir (can be a Drive path on Colab)")
     p.add_argument("--seed",   type=int, default=42)
     p.add_argument("--device", default="cuda")
+
+    # Post-training comprehensive evaluation (mirrors train_client.py).
+    # Default: comprehensive eval runs on best snapshot AND final-round state.
+    # Pass --no-heavy to skip the heavy (UnifiedQA + DeBERTa NLI) metrics.
+    # Without --openai-api-key, OpenAI-based metrics (Answer Relevancy,
+    # Bloom's LLM judge, LLM judge) are skipped silently.
+    p.add_argument("--openai-api-key", default=None,
+                   help="OpenAI key for Answer Relevancy + LLM judges.")
+    p.add_argument("--no-heavy", action="store_true",
+                   help="Skip UnifiedQA (RTC, QAFactEval, RQUGE) + DeBERTa NLI "
+                        "(Faithfulness) in the post-training comprehensive eval.")
+    p.add_argument("--blooms-model", default="cip29/bert-blooms-taxonomy-classifier",
+                   help="HF model ID for the local Bloom's classifier "
+                        "(set to '' to skip).")
+    p.add_argument("--no-comprehensive-eval", action="store_true",
+                   help="Skip the post-training comprehensive eval block "
+                        "entirely. Only the existing per-round monitoring eval "
+                        "(ROUGE-L / BLEU-4 / BERTScore) runs.")
 
     return p.parse_args()
 
@@ -453,8 +554,11 @@ def main() -> None:
     trainer = LocalTrainer(cfg)
     weights = [c.n_train_samples for c in clients]
 
-    if global_test:
-        evaluator = Evaluator(clients, cfg, device)
+    # Evaluator is needed for both (a) per-round monitoring eval (only when
+    # global_test exists) and (b) post-training comprehensive eval (always
+    # available). Build it unconditionally so comprehensive eval works without
+    # a global_test.json.
+    evaluator = Evaluator(clients, cfg, device)
 
     final_metrics: dict = {}
 
@@ -585,6 +689,34 @@ def main() -> None:
         _load_state_from_dir(clients, best_snapshot_dir, device)
     else:
         print("\nNo best snapshot to restore — using final-round state.")
+
+    # ── Post-training comprehensive evaluation (best + final) ────────────────
+    # Mirrors train_client.py's dual best/final eval pattern. Default-on;
+    # disable with --no-comprehensive-eval, or skip pieces with --no-heavy /
+    # no openai key / --blooms-model "".
+    if not args.no_comprehensive_eval:
+        if not args.no_heavy:
+            _ensure_nltk_punkt()
+
+        # 1. Best snapshot — model is already restored above.
+        _run_comprehensive_eval_per_client(
+            clients, evaluator, output_dir, "best",
+            args, device, global_test,
+        )
+
+        # 2. Final-round state — load it, eval it, then restore best so the
+        #    rest of main() (lightweight final eval + fed_final/ save) still
+        #    operates on the snapshot we report in final_metrics_per_client.json.
+        if final_round_dir.exists():
+            print(f"\n  Loading final-round state from {final_round_dir} for eval …")
+            _load_state_from_dir(clients, final_round_dir, device)
+            _run_comprehensive_eval_per_client(
+                clients, evaluator, output_dir, "final",
+                args, device, global_test,
+            )
+            if best_round > 0 and best_snapshot_dir.exists():
+                print("\n  Restoring best snapshot for downstream save / lightweight eval …")
+                _load_state_from_dir(clients, best_snapshot_dir, device)
 
     # ── Final evaluation on the (possibly restored) best snapshot ────────────
     if global_test:

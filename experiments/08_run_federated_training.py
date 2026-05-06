@@ -22,12 +22,16 @@ Usage (Colab terminal):
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 REPO_DIR = str(Path(__file__).resolve().parent.parent)
+sys.path.insert(0, str(Path(__file__).parent))
+
+from _common import default_key_search_paths, load_openai_key
 
 
 def parse_args() -> argparse.Namespace:
@@ -78,11 +82,50 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--resume-from-round",      type=int, default=0)
     p.add_argument("--seed",   type=int, default=42)
     p.add_argument("--device", default="cuda")
+
+    # Post-training comprehensive eval (mirrors 03_run_three_conditionings.py).
+    # Default: comprehensive runs on best snapshot AND final-round state.
+    # Pass --fast-eval to skip everything except the lightweight 3-metric
+    # combo + local Bloom's classifier.
+    p.add_argument("--fast-eval", action="store_true",
+                   help="Skip heavy (UnifiedQA / DeBERTa NLI) and LLM-based "
+                        "metrics in the post-training eval. Passes --no-heavy "
+                        "to train_federated.py and skips OpenAI key loading.")
+    p.add_argument("--no-comprehensive-eval", action="store_true",
+                   help="Disable the post-training per-client comprehensive "
+                        "eval block entirely (only the existing per-round "
+                        "monitoring eval runs).")
+    p.add_argument("--openai-api-key", default=None,
+                   help="Override; otherwise loaded from env / repo / drive.")
+    p.add_argument("--drive-dir", default=None,
+                   help="Drive root (used to find an openai_api_key file there).")
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+
+    # Resolve the OpenAI key for comprehensive eval (mirrors 03's logic).
+    api_key: str | None = None
+    if not args.fast_eval and not args.no_comprehensive_eval:
+        if args.openai_api_key and args.openai_api_key.startswith("sk-"):
+            api_key, source = args.openai_api_key, "<--openai-api-key arg>"
+        else:
+            api_key, source = load_openai_key(
+                *default_key_search_paths(REPO_DIR, args.drive_dir)
+            )
+        if api_key:
+            os.environ["OPENAI_API_KEY"] = api_key
+            print(f"OpenAI key loaded from: {source}")
+        else:
+            print("WARNING: no OpenAI API key found — Answer Relevancy + LLM "
+                  "judges will be skipped. Place an 'openai_api_key' file at "
+                  "the repo root, set OPENAI_API_KEY, or pass --openai-api-key sk-... "
+                  "to enable them.")
+    elif args.fast_eval:
+        print("Fast eval mode: skipping heavy + LLM-based metrics.")
+    else:
+        print("Comprehensive eval disabled (--no-comprehensive-eval).")
 
     train_script = str(Path(REPO_DIR) / "unifiedfl" / "train_federated.py")
 
@@ -126,6 +169,12 @@ def main() -> None:
         "--seed",                   str(args.seed),
         "--device",                 args.device,
     ]
+    if args.fast_eval:
+        cmd.append("--no-heavy")
+    if args.no_comprehensive_eval:
+        cmd.append("--no-comprehensive-eval")
+    if api_key:
+        cmd += ["--openai-api-key", api_key]
     for spec in client_specs:
         cmd += ["--client", spec]
 
@@ -134,7 +183,9 @@ def main() -> None:
     print(f"  {len(client_specs)} clients × {args.num_rounds} rounds × {args.local_epochs} local epochs")
     print(f"  ≈ {args.num_rounds * args.local_epochs} effective training passes per client")
     print(f"{'='*70}")
-    print("  " + " ".join(cmd), flush=True)
+    # Don't echo the API key
+    safe = ["sk-***" if (api_key and c == api_key) else c for c in cmd]
+    print("  " + " ".join(safe), flush=True)
 
     t0 = time.time()
     rc = subprocess.call(cmd)
