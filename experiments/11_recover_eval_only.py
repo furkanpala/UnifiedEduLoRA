@@ -54,6 +54,7 @@ import torch
 # script uses, so the recovered metrics are bit-for-bit comparable to the
 # fold1 metrics that were written during the un-interrupted run.
 from train_client import (
+    _ensure_nltk_punkt,
     _evaluate,             # noqa: F401  (used inside _run_full_eval)
     _load_best,
     _load_split,
@@ -172,6 +173,11 @@ def main() -> None:
             f"FINAL adapter not found at {final_dir}/lora_model. "
             "Training did not finish — re-run the fold instead."
         )
+
+    # Comprehensive metrics use NLTK sent_tokenize (faithfulness, qafacteval).
+    # train_client.py ensures punkt_tab is downloaded before eval; mirror that.
+    if not args.no_heavy:
+        _ensure_nltk_punkt()
 
     splits_dir   = Path(args.splits_dir)
     val_samples  = _load_split(splits_dir, args.client_id, args.fold, "val")
