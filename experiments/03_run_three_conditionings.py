@@ -57,7 +57,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch-size",       type=int,   default=4)
     p.add_argument("--lr",               type=float, default=3e-4)
     p.add_argument("--patience",         type=int,   default=10)
-    p.add_argument("--preview-every",    type=int,   default=0)
+    p.add_argument("--preview-every",    type=int,   default=5,
+                   help="Generate a sample QA from the val set every N epochs "
+                        "(matches train_client.py default). Pass 0 to disable.")
     p.add_argument("--checkpoint-every", type=int,   default=5,
                    help="Save a full LoRA + optimizer + scheduler checkpoint "
                         "every N epochs (matches train_client.py default). "
