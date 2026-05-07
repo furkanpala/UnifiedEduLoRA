@@ -111,6 +111,17 @@ def parse_args() -> argparse.Namespace:
                    help="Path to a JSON file of flat QA samples; if provided, "
                         "metrics_global_test.json is also written for each "
                         "checkpoint.")
+    p.add_argument("--eval-local-test", action="store_true",
+                   help="Also evaluate on the per-client local test set "
+                        "(client_{ID}_test.json from --splits-dir) and write "
+                        "metrics_test.json next to metrics_val.json. Useful "
+                        "for the indiv-vs-fed comparison where the individual "
+                        "training never saw the test set.")
+    p.add_argument("--skip-val-eval", action="store_true",
+                   help="Don't re-run the val eval (e.g., metrics_val.json "
+                        "already exists from training). Combined with "
+                        "--eval-local-test and --global-test-file, this lets "
+                        "you back-fill only the held-out splits.")
 
     # Toggles for skipping one side of the work
     p.add_argument("--skip-final", action="store_true",
@@ -182,6 +193,17 @@ def main() -> None:
     splits_dir   = Path(args.splits_dir)
     val_samples  = _load_split(splits_dir, args.client_id, args.fold, "val")
 
+    # Optional: per-client local test (single test file per client, no fold suffix).
+    local_test_samples = None
+    if args.eval_local_test:
+        import json as _json
+        test_path = splits_dir / f"client_{args.client_id}_test.json"
+        if test_path.exists():
+            local_test_samples = _json.loads(test_path.read_text(encoding="utf-8"))
+            print(f"Local test set: {len(local_test_samples)} samples ({test_path})")
+        else:
+            print(f"WARNING: --eval-local-test set but {test_path} not found — skipping.")
+
     global_test_samples = None
     if args.global_test_file:
         gt_path = Path(args.global_test_file)
@@ -209,51 +231,50 @@ def main() -> None:
         device=device,
     )
 
-    # ── FINAL ────────────────────────────────────────────────────────────────
-    final_metrics_path = results_dir / "final" / "metrics_val.json"
-    skip_final = args.skip_final or (final_metrics_path.exists() and not args.force)
-    if skip_final:
-        print(f"\n[skip] FINAL eval — {final_metrics_path} "
-              f"{'already exists' if final_metrics_path.exists() else 'requested skip'}")
-    else:
-        print(f"\n{'=' * 60}\n  Loading FINAL checkpoint\n{'=' * 60}")
-        _load_best(client_model, final_dir)  # _load_best is generic — loads {dir}/lora_model
-        print(f"\n{'=' * 60}\n  Evaluating FINAL checkpoint\n{'=' * 60}")
-        _run_full_eval(
-            client_model, val_samples, args, device, use_amp,
-            out_dir=results_dir / "final", split_name="val",
-        )
+    def _eval_one_ckpt(ckpt_label: str, ckpt_dir: Path):
+        out_dir = results_dir / ckpt_label
+        # Per-split skip-logic: a side is run only if it's both requested AND
+        # missing (or --force). That makes back-fill calls (e.g. --eval-local-test
+        # --skip-val-eval) cheap when val was already produced during training.
+        plan: list[tuple[str, list]] = []
+        if not args.skip_val_eval:
+            plan.append(("val", val_samples))
+        if local_test_samples is not None:
+            plan.append(("test", local_test_samples))
         if global_test_samples is not None:
-            _run_full_eval(
-                client_model, global_test_samples, args, device, use_amp,
-                out_dir=results_dir / "final", split_name="global_test",
-            )
-
-    # ── BEST ─────────────────────────────────────────────────────────────────
-    best_metrics_path = results_dir / "best" / "metrics_val.json"
-    skip_best = args.skip_best or (best_metrics_path.exists() and not args.force)
-    if skip_best:
-        print(f"\n[skip] BEST eval — {best_metrics_path} "
-              f"{'already exists' if best_metrics_path.exists() else 'requested skip'}")
-    else:
-        print(f"\n{'=' * 60}\n  Loading BEST checkpoint\n{'=' * 60}")
+            plan.append(("global_test", global_test_samples))
+        # Drop splits whose metrics file is already present unless --force
+        plan = [(n, s) for (n, s) in plan
+                if args.force or not (out_dir / f"metrics_{n}.json").exists()]
+        if not plan:
+            print(f"\n[skip] {ckpt_label.upper()} — all requested splits already evaluated.")
+            return
+        print(f"\n{'=' * 60}\n  Loading {ckpt_label.upper()} checkpoint\n{'=' * 60}")
         if device.type == "cuda":
             client_model.model.to(device)
             gc.collect()
             torch.cuda.empty_cache()
-        _load_best(client_model, best_dir)
-        print(f"\n{'=' * 60}\n  Evaluating BEST checkpoint\n{'=' * 60}")
-        _run_full_eval(
-            client_model, val_samples, args, device, use_amp,
-            out_dir=results_dir / "best", split_name="val",
-        )
-        if global_test_samples is not None:
+        _load_best(client_model, ckpt_dir)
+        print(f"\n{'=' * 60}\n  Evaluating {ckpt_label.upper()} on {[n for n,_ in plan]}\n{'=' * 60}")
+        for split_name, samples in plan:
             _run_full_eval(
-                client_model, global_test_samples, args, device, use_amp,
-                out_dir=results_dir / "best", split_name="global_test",
+                client_model, samples, args, device, use_amp,
+                out_dir=out_dir, split_name=split_name,
             )
 
-    print(f"\nDone. Per-checkpoint metrics → {results_dir}/{{best,final}}/metrics_val.json")
+    # ── FINAL ────────────────────────────────────────────────────────────────
+    if args.skip_final:
+        print(f"\n[skip] FINAL eval — requested via --skip-final")
+    else:
+        _eval_one_ckpt("final", final_dir)
+
+    # ── BEST ─────────────────────────────────────────────────────────────────
+    if args.skip_best:
+        print(f"\n[skip] BEST eval — requested via --skip-best")
+    else:
+        _eval_one_ckpt("best", best_dir)
+
+    print(f"\nDone. Per-checkpoint metrics → {results_dir}/{{best,final}}/metrics_*.json")
 
 
 if __name__ == "__main__":
