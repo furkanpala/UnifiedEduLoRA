@@ -2341,14 +2341,15 @@ below is identical across the three institutions.
 
 \begin{table*}[t]
 \centering
-\small
-\setlength{\tabcolsep}{6pt}
+\footnotesize
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.05}
 \caption{Public-testbed hyperparameters. Identical
 across the three clients unless noted. Per-client
 backbone, LoRA-target naming, and $d_{\text{model}}$
 appear in Table~\ref{tab:client_models}.}
 \label{tab:hyperparams_full}
-\begin{tabular}{lll}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.18\linewidth}>{\raggedright\arraybackslash}p{0.30\linewidth}>{\raggedright\arraybackslash}p{0.48\linewidth}@{}}
 \toprule
 \textbf{Block} & \textbf{Hyperparameter} & \textbf{Value} \\
 \midrule
@@ -2395,9 +2396,9 @@ appear in Table~\ref{tab:client_models}.}
   & Learning rate (LoRA)                       & $3 \times 10^{-4}$ \\
   & Learning rate (GAT)                        & $1 \times 10^{-3}$ \\
   & Learning rate (FiLM)                       & $1 \times 10^{-3}$ \\
-  & Best-snapshot metric                       & avg greedy ROUGE-L on $50$ fixed val samples / client (post-aggregation) \\
+  & Best-snapshot metric                       & avg greedy ROUGE-L on $50$ val samples / client, post-aggregation \\
   & Periodic checkpoint                        & every $5$ rounds \\
-  & FedAvg scope                               & sample-size-weighted; GAT params only (LoRA + FiLM stay client-local) \\
+  & FedAvg scope                               & sample-size-weighted; GAT only (LoRA + FiLM client-local) \\
 \midrule
 
 \multirow{6}{*}{\textbf{GAT (\UniEdu{})}}
@@ -2418,16 +2419,17 @@ appear in Table~\ref{tab:client_models}.}
 \multirow{4}{*}{\textbf{Mixed precision}}
   & Base-model dtype                           & FP32 (frozen) \\
   & LoRA adapter dtype                         & FP32 \\
-  & Autocast                                   & BF16 on CUDA when supported; FP32 otherwise \\
-  & GradScaler                                 & disabled (BF16 has FP32-range exponent) \\
+  & Autocast                                   & BF16 on CUDA when supported, else FP32 \\
+  & GradScaler                                 & disabled (BF16 has full FP32 range) \\
 \midrule
 
-\multirow{5}{*}{\textbf{Reproducibility}}
-  & \texttt{torch.manual\_seed} / \texttt{numpy.random.seed} / \texttt{random.seed} & $42$ \\
+\multirow{6}{*}{\textbf{Reproducibility}}
+  & \texttt{torch} / \texttt{numpy} / \texttt{random} seeds & $42$ \\
   & cuDNN deterministic                        & \texttt{True} \\
   & cuDNN benchmark                            & \texttt{False} \\
-  & \texttt{torch.use\_deterministic\_algorithms} & \texttt{True} (\texttt{warn\_only=True}) \\
-  & \texttt{CUBLAS\_WORKSPACE\_CONFIG}, \texttt{PYTHONHASHSEED} & \texttt{:4096:8}, \texttt{42} \\
+  & \texttt{use\_deterministic\_algorithms}    & \texttt{True} (\texttt{warn\_only=True}) \\
+  & \texttt{CUBLAS\_WORKSPACE\_CONFIG}         & \texttt{:4096:8} \\
+  & \texttt{PYTHONHASHSEED}                    & \texttt{42} \\
 
 \bottomrule
 \end{tabular}
