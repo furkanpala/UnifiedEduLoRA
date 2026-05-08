@@ -1124,7 +1124,7 @@ encoder-decoder families with different attention
 mechanisms, pre-training objectives, and effective
 context windows (Table~\ref{tab:client_models}).
 
-\begin{table}[t]
+\begin{table*}[t]
 \centering
 \small
 \caption{SLMs used in the public and private testbeds.
@@ -1146,7 +1146,7 @@ Pegasus-X-base           & \texttt{pegasus\_x} & \texttt{q\_proj v\_proj}       
 ProphetNet-large         & \texttt{prophetnet} & \texttt{query\_proj value\_proj} & 1024 & 392M \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 \subsection{Training Procedure}
 \label{sec:training}
@@ -1680,7 +1680,21 @@ pooled across institutions; best checkpoint, mean
 over 3 folds). Lightweight reference-based metrics
 on the left; reference-free LLM-based metrics on
 the right (\S\ref{sec:eval}). Bold = better of
-$\{\indiv, \uni\}$ per (institution, metric).}
+$\{\indiv, \uni\}$ per (institution, metric).
+\textbf{Column abbreviations.} R-L: ROUGE-L F1.
+B-4: BLEU-4. BERT: BERTScore-F1.
+B\textsubscript{cls}: educational-value score
+(EVS) from a local fine-tuned BERT Bloom's
+classifier. B\textsubscript{LLM}: EVS from a
+GPT-4o-mini Bloom's judge. AnsR: RAGAS Answer
+Relevancy (cosine similarity between the original
+question and a reverse-generated counterpart).
+Faith: RAGAS Faithfulness (fraction of answer
+claims entailed by the context). QAFE: QAFactEval
+(approximate). RQU: RQUGE (in $[1,5]$, others in
+$[0,1]$). RTC: Round-Trip Consistency. LLM-J:
+GPT-4o LLM-judge overall, mean of four 1--5
+rubric dimensions normalised to $[0,1]$.}
 \label{tab:headline_global}
 \begin{tabular}{ll cccc ccccccc}
 \toprule
@@ -1724,7 +1738,8 @@ testbed (best checkpoint, mean over 3 folds). Top
 half: each client's \textbf{local val} set; bottom
 half: each client's \textbf{local test} set. Bold =
 better of $\{\indiv, \uni\}$ per (institution,
-metric).}
+metric). Column abbreviations are defined in the
+caption of Table~\ref{tab:headline_global}.}
 \label{tab:val_test}
 \begin{tabular}{ll cccc ccccccc}
 \toprule
@@ -2622,7 +2637,9 @@ deltas for each baseline relative to \UniEdu{}.
 Table~\ref{tab:headline_global}. Public testbed,
 \textbf{global test set}, last-epoch / last-round
 state, mean over 3 folds. Bold = better of
-$\{\indiv, \uni\}$ per (institution, metric).}
+$\{\indiv, \uni\}$ per (institution, metric).
+Column abbreviations are defined in the caption of
+Table~\ref{tab:headline_global}.}
 \label{tab:appendix_global_final}
 \begin{tabular}{ll cccc ccccccc}
 \toprule
@@ -2659,7 +2676,9 @@ $\{\indiv, \uni\}$ per (institution, metric).}
 \caption{Final-checkpoint counterpart of
 Table~\ref{tab:val_test}. Public testbed, in-distribution
 slices, last-epoch / last-round state, mean over 3
-folds. Bold = better of $\{\indiv, \uni\}$.}
+folds. Bold = better of $\{\indiv, \uni\}$. Column
+abbreviations are defined in the caption of
+Table~\ref{tab:headline_global}.}
 \label{tab:appendix_val_test_final}
 \begin{tabular}{ll cccc ccccccc}
 \toprule
