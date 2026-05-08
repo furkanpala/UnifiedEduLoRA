@@ -166,8 +166,7 @@ measure QA quality across reference-based,
 reference-free, pedagogical, and LLM-judge axes,
 together with three equity-specific metrics
 (\S\ref{sec:equity}).
-% TODO(fp): tighten the H2 quantitative summary once the OpenAI-enabled
-% comprehensive eval pass and the diverse-LLM zero-shot panel are run.
+\red{TODO: tighten the H2 quantitative summary once the OpenAI-enabled comprehensive eval pass and the diverse-LLM zero-shot panel are run.}
 \end{abstract}
 
 %% ════════════════════════════════════════════════════════════
@@ -950,7 +949,7 @@ backbone size. LoRA and FiLM are never aggregated, so
 heterogeneity in their dimension is irrelevant to the
 protocol.
 
-% TODO(fp): confirm any client-sampling deviation from the all-clients-each-round default; verify final round counts and any warm-up.
+\red{TODO: confirm any client-sampling deviation from the all-clients-each-round default; verify final round counts and any warm-up.}
 
 \begin{algorithm}[t]
 \caption{\UniEdu{}: unified federated learning for AQAG.}
@@ -1108,7 +1107,7 @@ software preferences (Table~\ref{tab:client_models}),
 prioritising architectural diversity. The federation
 involves no central training corpus; each
 institution's training data is its own.
-% TODO(fp): institutional names (or anonymous IDs $\mathcal{I}_0,\dots,\mathcal{I}_4$); recruitment-form demographic figure; per-institution chunk and QA-pair counts; topic-coverage histograms.
+\red{TODO: institutional names (or anonymous IDs $\mathcal{I}_0,\dots,\mathcal{I}_4$); recruitment-form demographic figure; per-institution chunk and QA-pair counts; topic-coverage histograms.}
 
 \subsection{Model Zoo}
 \label{sec:models}
@@ -1232,7 +1231,7 @@ the same val set:
   knowledge distillation: each client trains a small
   ``mentee'' model that distils both the local
   ``mentor'' and the federated ensemble; only mentee
-  parameters are exchanged. % TODO(fp): implement FedKD in \texttt{unifiedfl/}.
+  parameters are exchanged. \red{TODO: implement FedKD in \texttt{unifiedfl/}.}
   \item \textbf{FedMD}~\citep{li2019fedmd}. The
   canonical heterogeneous-federated-learning
   baseline. Each client trains its own SLM locally,
@@ -1243,7 +1242,7 @@ the same val set:
   heterogeneity is handled by-design because clients
   exchange logits rather than parameters. We use the
   public-testbed chunks (\S\ref{sec:public_testbed})
-  as the shared dataset. % TODO(fp): implement FedMD in \texttt{unifiedfl/}.
+  as the shared dataset. \red{TODO: implement FedMD in \texttt{unifiedfl/}.}
   \item \textbf{FedDF}~\citep{lin2020feddf}.
   Server-side ensemble distillation on an unlabeled
   public dataset; no parameter averaging. Like
@@ -1251,7 +1250,7 @@ the same val set:
   output-space rather than parameter-space exchange,
   but moves the distillation step to the server.
   Re-uses the same public dataset as FedMD.
-  % TODO(fp): implement FedDF in \texttt{unifiedfl/}.
+  \red{TODO: implement FedDF in \texttt{unifiedfl/}.}
   \item \textbf{FedET}~\citep{cheng2022fedet}.
   Communicates per-client embeddings rather than
   logits: each client uploads its hidden-state
@@ -1260,7 +1259,7 @@ the same val set:
   aggregator, and clients distil the fused
   representation back into their local SLM. Closer
   in spirit to \UniEdu{}'s embedding-channel design
-  than FedMD/FedDF's logit channel. % TODO(fp): implement FedET in \texttt{unifiedfl/}.
+  than FedMD/FedDF's logit channel. \red{TODO: implement FedET in \texttt{unifiedfl/}.}
 
 \smallskip
 Implementation details for all four
@@ -1536,7 +1535,7 @@ Under Eq.~\ref{eq:anchor_condition}:
 \end{equation}
 \end{proposition}
 
-% TODO(fp): confirm at least one collaborator pair satisfies Eq.~\ref{eq:anchor_condition}, or operationalize an approximate matching by binning $\mathcal{R}_k$.
+\red{TODO: confirm at least one collaborator pair satisfies Eq.~\ref{eq:anchor_condition}, or operationalize an approximate matching by binning $\mathcal{R}_k$.}
 
 \subsubsection{Knowledge Transfer Index}
 \label{sec:kti}
@@ -1653,10 +1652,7 @@ for architectural diversity: the data-poor client
 is the one that benefits most from the shared
 inductive bias.
 
-% TODO(fp): re-run all (client, fold) cells with --no-heavy off + an
-% OpenAI key to populate the LLM-based block (RTC, Faith., QAFE, RQUGE,
-% Ans-Rel, Bloom-LLM EVS, LLM-judge overall). The current --fast-eval
-% pass produced only the four lightweight columns.
+\red{TODO: re-run all (client, fold) cells with --no-heavy off + an OpenAI key to populate the LLM-based block (RTC, Faith., QAFE, RQUGE, Ans-Rel, Bloom-LLM EVS, LLM-judge overall). The current --fast-eval pass produced only the four lightweight columns.}
 \begin{table*}[t]
 \centering
 \footnotesize
@@ -1716,8 +1712,7 @@ rubric dimensions normalized to $[0,1]$.}
 \end{tabular}
 \end{table*}
 
-% TODO(fp): same back-fill applies — local val and local test cells
-% currently populated for lightweight metrics only.
+\red{TODO: same back-fill applies — local val and local test cells currently populated for lightweight metrics only.}
 \begin{table*}[t]
 \centering
 \footnotesize
@@ -1775,10 +1770,7 @@ caption of Table~\ref{tab:headline_global}.}
 \end{tabular}
 \end{table*}
 
-% TODO(fp): private testbed (5 institutions) not yet collected; cells stay
-% as "--" until Phase~2 of the private collaboration finishes. Methods rows
-% (FedKD/MD/DF/ET) are also TODO — those baselines have not been run yet
-% on the public testbed either.
+\red{TODO: private testbed (5 institutions) not yet collected; cells stay as "--" until Phase~2 of the private collaboration finishes. Methods rows (FedKD/MD/DF/ET) are also TODO — those baselines have not been run yet on the public testbed either.}
 \begin{table*}[t]
 \centering
 \small
@@ -1853,10 +1845,7 @@ Table~\ref{tab:headline_global}.}
 \end{tabular}
 \end{table*}
 
-% TODO(fp): Bloom-BERT EVS values for \UniEdu{} can be filled from the
-% blooms_cls_evs_mean key already present in metrics_*.json (best ckpt,
-% global test). Bloom-LLM EVS and LLM-judge columns require a re-run with
-% the OpenAI key enabled.
+\red{TODO: Bloom-BERT EVS values for \UniEdu{} can be filled from the blooms_cls_evs_mean key already present in metrics_*.json (best ckpt, global test). Bloom-LLM EVS and LLM-judge columns require a re-run with the OpenAI key enabled.}
 \begin{table*}[t]
 \centering
 \small
@@ -1904,8 +1893,7 @@ Method rows: \textbf{Indiv} (\S\ref{sec:baselines}),
 \end{tabular}
 \end{table*}
 
-% TODO(fp): four-dim LLM-judge breakdown not yet populated; needs the same
-% OpenAI-enabled re-run flagged for tab:headline_global.
+\red{TODO: four-dim LLM-judge breakdown not yet populated; needs the same OpenAI-enabled re-run flagged for tab:headline_global.}
 \begin{table}[t]
 \centering
 \footnotesize
@@ -1925,9 +1913,7 @@ $\mathcal{I}_2$ & -- & -- & -- & -- \\
 \end{tabular}
 \end{table}
 
-% TODO(fp): UniEdu-static (graph features frozen at round 0) and
-% UniEdu-noFiLM (GAT trained but not fed into the LM) ablations not yet
-% run; one-fold pilot per ablation will go here.
+\red{TODO: UniEdu-static (graph features frozen at round 0) and UniEdu-noFiLM (GAT trained but not fed into the LM) ablations not yet run; one-fold pilot per ablation will go here.}
 \begin{table}[t]
 \centering
 \small
@@ -1951,7 +1937,7 @@ relative to full \UniEdu{} on LLM-judge overall.}
 \subsection{Per-Institution Uplift and Knowledge Transfer}
 \label{sec:results_kti}
 
-% TODO(fp): private-testbed uplift; awaits private Phase~2 outputs.
+\red{TODO: private-testbed uplift; awaits private Phase~2 outputs.}
 \begin{table}[t]
 \centering
 \footnotesize
@@ -1975,8 +1961,7 @@ $\mathcal{I}_4$ (ProphetNet)  & -- & -- & -- & -- \\
 \end{tabular}
 \end{table}
 
-% TODO(fp): KTI requires per-direction held-out eval on
-% T_{k\setminus l} chunks; eval pool not yet curated.
+\red{TODO: KTI requires per-direction held-out eval on T_{k\setminus l} chunks; eval pool not yet curated.}
 \begin{table}[t]
 \centering
 \small
@@ -2012,9 +1997,7 @@ $\mathcal{I}_2 \leftarrow \mathcal{I}_0$
 \subsection{Statistical Validation}
 \label{sec:results_stats}
 
-% TODO(fp): per spec, no p-values until n>>3 folds; this table is left
-% as a stub for the camera-ready when the full federation × seed grid
-% (>=10 seeds per institution) has been run.
+\red{TODO: per spec, no p-values until n>>3 folds; this table is left as a stub for the camera-ready when the full federation × seed grid (>=10 seeds per institution) has been run.}
 \begin{table}[t]
 \centering
 \small
@@ -2053,10 +2036,7 @@ template, then scoring the resulting $(q, a)$ with
 the same evaluation suite (prompt in
 Appendix~\ref{app:llm_baselines}).
 
-% TODO(fp): single-LLM zero-shot panel (GPT-4o, GPT-4o-mini,
-% Llama-3.1-8B-Inst, Qwen-2.5-7B-Inst, Mistral-7B-Inst, Gemini-1.5-Flash)
-% not yet collected; UniEdu federated-mixture row also pending the
-% OpenAI-enabled re-run.
+\red{TODO: single-LLM zero-shot panel (GPT-4o, GPT-4o-mini, Llama-3.1-8B-Inst, Qwen-2.5-7B-Inst, Mistral-7B-Inst, Gemini-1.5-Flash) not yet collected; UniEdu federated-mixture row also pending the OpenAI-enabled re-run.}
 \begin{table*}[t]
 \centering
 \small
@@ -2089,7 +2069,7 @@ Gemini-1.5-Flash    & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 \subsection{Qualitative Examples}
 \label{sec:results_qualitative}
 
-% TODO(fp): one $(c, q^{\indiv}, q^{\uni}, q^{\text{GPT-4o}})$ sample per institution, chosen to illustrate the federation's effect. Place the full set in Appendix~\ref{app:qualitative}; reproduce one or two illustrative examples in the body.
+\red{TODO: one $(c, q^{\indiv}, q^{\uni}, q^{\text{GPT-4o}})$ sample per institution, chosen to illustrate the federation's effect. Place the full set in Appendix~\ref{app:qualitative}; reproduce one or two illustrative examples in the body.}
 
 %% ════════════════════════════════════════════════════════════
 \section{Discussion}
@@ -2189,7 +2169,7 @@ institutional curricula.
   supported in principle (FiLM hooks would attach
   to causal blocks identically) but are not
   exercised in this paper.
-  % TODO(fp): confirm whether to claim decoder-only support or scope strictly to encoder-decoder.
+  \red{TODO: confirm whether to claim decoder-only support or scope strictly to encoder-decoder.}
   \item \textbf{Bloom's labels and LLM judges.} The
   Bloom's BERT classifier and the LLM judges rely on
   pre-trained off-the-shelf models whose biases we do
@@ -2212,13 +2192,13 @@ institutional curricula.
   which makes per-fold evaluation API-cost-bounded
   rather than compute-bounded. We report API costs
   per institution per fold in
-  Appendix~% TODO(fp): [TODO: add appendix].
+  \red{[TODO: add appendix reference for per-(institution, fold) API costs]}.
 \end{itemize}
 
 %% ════════════════════════════════════════════════════════════
 \section*{Acknowledgments}
 
-% TODO(fp): institutional / compute / funding acknowledgments; thanks to the public-testbed source materials (MIT 18.657, Stanford CS229, arXiv) and the five collaborating institutions of the private testbed for their participation; etc.
+\red{TODO: institutional / compute / funding acknowledgments; thanks to the public-testbed source materials (MIT 18.657, Stanford CS229, arXiv) and the five collaborating institutions of the private testbed for their participation; etc.}
 
 %% ════════════════════════════════════════════════════════════
 % Custom bibliography only (no Anthology). Switch to
@@ -2302,24 +2282,7 @@ exact string sent to the API after
 \section{Hyperparameter Tables}
 \label{app:hyperparams}
 
-% TODO(fp): two caveats from the launch-time verification audit
-% (2026-05-08) that the table presents as if uniform across runs:
-%   (a) client_2/fold_1/best/metrics_val.json has the full
-%       comprehensive eval suite (947 KB, includes faithfulness,
-%       qafacteval, rquge, answer_relevancy, llm_judge_*) — that
-%       cell was either launched without --no-heavy or re-evaluated
-%       comprehensively post hoc. The lightweight numbers used in
-%       Tables 1/2 remain valid and apples-to-apples with the other
-%       cells; only the "every cell ran with --fast-eval" claim is
-%       technically false for that file.
-%   (b) The deterministic-CUDA reproducibility setup (commit e079ace,
-%       2026-05-06 16:11 BST) was active for all DoC-launched runs
-%       (fed fold2/3, indiv c2/f3); for the earlier Colab-launched
-%       runs the launch commit is not on-machine-recoverable, so
-%       deterministic mode is unconfirmed for those. Practical
-%       output deltas are negligible but the literal "fully
-%       deterministic, seed=42" framing applies cleanly only to the
-%       DoC-launched cells.
+\red{TODO: two caveats from the launch-time verification audit (2026-05-08) that the table presents as if uniform across runs:   (a) client_2/fold_1/best/metrics_val.json has the full       comprehensive eval suite (947 KB, includes faithfulness,       qafacteval, rquge, answer_relevancy, llm_judge_*) — that       cell was either launched without --no-heavy or re-evaluated       comprehensively post hoc. The lightweight numbers used in       Tables 1/2 remain valid and apples-to-apples with the other       cells; only the "every cell ran with --fast-eval" claim is       technically false for that file.   (b) The deterministic-CUDA reproducibility setup (commit e079ace,       2026-05-06 16:11 BST) was active for all DoC-launched runs       (fed fold2/3, indiv c2/f3); for the earlier Colab-launched       runs the launch commit is not on-machine-recoverable, so       deterministic mode is unconfirmed for those. Practical       output deltas are negligible but the literal "fully       deterministic, seed=42" framing applies cleanly only to the       DoC-launched cells.}
 
 Table~\ref{tab:hyperparams_full} reports every
 hyperparameter used across the public-testbed runs.
@@ -2456,7 +2419,7 @@ including \texttt{question\_topic}, integer
 deterministic 3-fold CV splits with seed~$=42$;
 and (iv)~MD5 checksums of every split file.
 
-% TODO(fp): insert the per-source chunk-count and QA-pair-count table; insert the checksum file in verbatim form.
+\red{TODO: insert the per-source chunk-count and QA-pair-count table; insert the checksum file in verbatim form.}
 
 \section{Balanced vs.\ Unbalanced Public Testbed}
 \label{app:balanced_vs_unbalanced}
@@ -2472,7 +2435,7 @@ randomly sub-sampled to match the smaller
 institutions (110 chunks each, deterministic with
 seed~$=42$).
 
-% TODO(fp): insert side-by-side comparison table once Phase~2 finishes for both variants. Expectation: the GAT-mediated transfer should remain measurable in the balanced setting, isolating the federation effect from raw data-quantity effects.
+\red{TODO: insert side-by-side comparison table once Phase~2 finishes for both variants. Expectation: the GAT-mediated transfer should remain measurable in the balanced setting, isolating the federation effect from raw data-quantity effects.}
 
 \section{Diverse-LLM Reference Panel}
 \label{app:llm_baselines}
@@ -2490,7 +2453,7 @@ context. Models: \texttt{gpt-4o},
 model's outputs are scored with the same evaluation
 suite as \UniEdu{}.
 
-% TODO(fp): insert Table comparing the diverse-LLM panel against \UniEdu{} on the public-testbed mean.
+\red{TODO: insert Table comparing the diverse-LLM panel against \UniEdu{} on the public-testbed mean.}
 
 \section{Architecture Graph Examples}
 \label{app:graph_examples}
@@ -2502,7 +2465,7 @@ have $|\mathcal{V}_k| \in [\sim\!200, \sim\!500]$
 nodes depending on backbone size; node feature
 vectors are 16-dimensional (\S\ref{sec:arch_graph}).
 
-% TODO(fp): insert one graph figure per family (BART, Flan-T5, LED, Pegasus-X, ProphetNet) generated via \texttt{unifiedfl/visualize\_graph.py}.
+\red{TODO: insert one graph figure per family (BART, Flan-T5, LED, Pegasus-X, ProphetNet) generated via \texttt{unifiedfl/visualize\_graph.py}.}
 
 \section{Computational Cost and API Usage}
 \label{app:cost}
@@ -2529,7 +2492,7 @@ four-dimension QA-quality judge collectively cost
 $\sim$\$0.30 per training run on the val set, scaling
 with val-set size.
 
-% TODO(fp): report final wall-clock and API totals per testbed; include a footnote on how the cost compares against running GPT-4o as the QA-generator itself (the natural opponent in our headline hypothesis).
+\red{TODO: report final wall-clock and API totals per testbed; include a footnote on how the cost compares against running GPT-4o as the QA-generator itself (the natural opponent in our headline hypothesis).}
 
 \section{Qualitative Examples}
 \label{app:qualitative}
@@ -2544,7 +2507,7 @@ hand to illustrate cases where federation closes the
 gap with GPT-4o, cases where it does not, and any
 qualitative failure modes.
 
-% TODO(fp): hand-pick examples post-results; format each as (context, indiv-QA, uni-QA, GPT-4o-QA) with a short comment.
+\red{TODO: hand-pick examples post-results; format each as (context, indiv-QA, uni-QA, GPT-4o-QA) with a short comment.}
 
 \section{Equity-Metric Derivations and Implementation}
 \label{app:equity_derivations}
@@ -2592,7 +2555,7 @@ post-processed from the output of
 \texttt{experiments/04\_aggregate\_results.py} via a
 small helper script
 (\texttt{experiments/11\_compute\_equity.py},
-% TODO(fp): implement).
+\red{TODO: implement).}
 
 \paragraph{Knowledge Transfer Index (KTI).}
 For a directed pair $(l \leftarrow k)$:
@@ -2637,7 +2600,7 @@ low-resource individual.
   \item Anchor Equity assumes there exists an anchor
   question $q^*$ over a concept covered by both $k$
   and $l$. We list the anchor questions used in
-  Table~% TODO(fp): [TODO].
+  \red{[TODO: add table of anchor questions]}.
 \end{itemize}
 
 \section{Distillation-Based Baseline Implementations}
@@ -2666,7 +2629,7 @@ public-distillation surface for the other three
 baselines.
 
 \paragraph{FedKD~\citep{wu2022fedkd}.}
-% TODO(fp): : (i)~mentor/mentee pair per client,
+\red{TODO: : (i)~mentor/mentee pair per client,}
 both seeded from the institution's local SLM
 checkpoint; (ii)~local distillation loss (KL on
 next-token distributions between mentor and mentee);
@@ -2674,7 +2637,7 @@ next-token distributions between mentor and mentee);
 (iv)~hyperparameter table.
 
 \paragraph{FedMD~\citep{li2019fedmd}.}
-% TODO(fp): : (i)~each client trains its local SLM
+\red{TODO: : (i)~each client trains its local SLM}
 on its private curriculum; (ii)~all clients
 generate logits (or top-$k$ next-token
 distributions) on the shared public dataset;
@@ -2685,7 +2648,7 @@ local SLM by adding a KL term on those examples;
 (v)~hyperparameter table.
 
 \paragraph{FedDF~\citep{lin2020feddf}.}
-% TODO(fp): : (i)~each client uploads logits on the
+\red{TODO: : (i)~each client uploads logits on the}
 shared public dataset; (ii)~the server runs
 ensemble distillation by training a small server-
 side model on the averaged ensemble outputs;
@@ -2695,7 +2658,7 @@ client-side parameter averaging anywhere in the
 pipeline; (v)~hyperparameter table.
 
 \paragraph{FedET~\citep{cheng2022fedet}.}
-% TODO(fp): : (i)~each client extracts hidden-state
+\red{TODO: : (i)~each client extracts hidden-state}
 representations on the shared public dataset from
 a chosen layer of its SLM; (ii)~server fuses
 representations through a small enhanced-transformer
@@ -2705,15 +2668,14 @@ representation-matching loss; (iv)~hyperparameter
 table.
 
 \paragraph{Implementation footprint.}
-% TODO(fp):  insert wall-clock and OpenAI-API cost
+\red{TODO: insert wall-clock and OpenAI-API cost}
 deltas for each baseline relative to \UniEdu{}.
 
 %% ════════════════════════════════════════════════════════════
 \section{Final-Checkpoint Results}
 \label{app:final_ckpt}
 
-% TODO(fp): same OpenAI-enabled re-run as the main paper would also fill
-% the LLM-based block here.
+\red{TODO: same OpenAI-enabled re-run as the main paper would also fill the LLM-based block here.}
 \begin{table*}[t]
 \centering
 \footnotesize
