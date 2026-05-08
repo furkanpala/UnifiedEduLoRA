@@ -34,6 +34,7 @@
 
 % ── Layout helpers ────────────────────────────────────────────
 \usepackage{booktabs}
+\usepackage{array}      % needed for >{\raggedright\arraybackslash} in p-column specs
 \usepackage{multirow}
 \usepackage{enumitem}
 \usepackage{xcolor}
@@ -2349,7 +2350,7 @@ across the three clients unless noted. Per-client
 backbone, LoRA-target naming, and $d_{\text{model}}$
 appear in Table~\ref{tab:client_models}.}
 \label{tab:hyperparams_full}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.18\linewidth}>{\raggedright\arraybackslash}p{0.30\linewidth}>{\raggedright\arraybackslash}p{0.48\linewidth}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.30\textwidth}>{\raggedright\arraybackslash}p{0.48\textwidth}@{}}
 \toprule
 \textbf{Block} & \textbf{Hyperparameter} & \textbf{Value} \\
 \midrule
