@@ -1783,9 +1783,17 @@ caption of Table~\ref{tab:headline_global}.}
 \centering
 \small
 \caption{Equity comparison on the \textbf{private
-testbed} (\S\ref{sec:private_testbed}). Same layout
-as Table~\ref{tab:headline_global} with five
-institutions instead of three.}
+testbed} (\S\ref{sec:private_testbed}). Five
+institutions, six methods per institution: the
+per-institution local baseline \textbf{Indiv}
+(\S\ref{sec:baselines}), four heterogeneous-FL
+distillation baselines
+\textbf{FedKD}~\citep{wu2022fedkd},
+\textbf{FedMD}~\citep{li2019fedmd},
+\textbf{FedDF}~\citep{lin2020feddf}, and
+\textbf{FedET}~\citep{cheng2022fedet}, and our
+\UniEdu{}. Column conventions follow
+Table~\ref{tab:headline_global}.}
 \label{tab:equity_private}
 \begin{tabular}{llcccccccc}
 \toprule
@@ -1856,7 +1864,12 @@ institutions instead of three.}
 \textbf{public testbed}. Bloom-EVS is in $[0, 1]$
 (Eq.~\ref{eq:evs}); LLM-judge is the overall mean
 across the four rubric dimensions, also in $[0, 1]$.
-Same set of methods as Table~\ref{tab:headline_global}.}
+Method rows: \textbf{Indiv} (\S\ref{sec:baselines}),
+\textbf{FedKD}~\citep{wu2022fedkd},
+\textbf{FedMD}~\citep{li2019fedmd},
+\textbf{FedDF}~\citep{lin2020feddf},
+\textbf{FedET}~\citep{cheng2022fedet}, and
+\UniEdu{}.}
 \label{tab:public_pedagogical}
 \begin{tabular}{llccc}
 \toprule
