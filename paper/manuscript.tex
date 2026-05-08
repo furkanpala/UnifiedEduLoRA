@@ -320,8 +320,8 @@ We evaluate \UniEdu{} on two complementary testbeds: a
 publicly reproducible benchmark constructed from MIT
 18.657, Stanford CS229, and an arXiv ML paper corpus
 (\S\ref{sec:public_testbed}); and a real-world
-federation of four collaborating institutions
-across four countries on three continents
+federation of five collaborating institutions
+across five countries on three continents
 (\S\ref{sec:private_testbed}). Standard
 n-gram metrics such as ROUGE and BLEU are necessary
 but not sufficient for educational AQAG, which
@@ -357,8 +357,8 @@ against GPT-4o as the single-LLM ceiling.
   per-institution uplift from federation.
   \item \textbf{Two-testbed empirical study} on a
   publicly reproducible benchmark and on a real-world
-  federation of four institutions spanning Tunisia,
-  Germany, Nigeria, and Colombia, comparing
+  federation of five institutions spanning Tunisia,
+  Germany, Nigeria, Colombia, and Peru, comparing
   \UniEdu{} against per-institution local baselines
   and a GPT-4o ceiling.
 \end{enumerate}
@@ -1006,10 +1006,10 @@ isolates the effect of architectural heterogeneity
 under controlled data conditions and lets external
 researchers reproduce the framework end-to-end. The
 \emph{private testbed} (\S\ref{sec:private_testbed})
-runs the same framework across four real
+runs the same framework across five real
 collaborating institutions in Tunisia, Germany,
-Nigeria, and Colombia training on their own private
-curricula, with the sample-size, vocabulary,
+Nigeria, Colombia, and Peru training on their own
+private curricula, with the sample-size, vocabulary,
 and stylistic heterogeneity that real
 deployments exhibit.
 
@@ -1089,10 +1089,10 @@ data quantity or of the GAT-mediated transfer
 \label{sec:private_testbed}
 
 The private testbed instantiates \UniEdu{} across
-\textbf{four real collaborating institutions}
-spanning four countries on three continents
-(Tunisia, Germany, Nigeria, and Colombia), each
-contributing its own private machine-learning
+\textbf{five real collaborating institutions}
+spanning five countries on three continents
+(Tunisia, Germany, Nigeria, Colombia, and Peru),
+each contributing its own private machine-learning
 curriculum. Concretely, each collaborator
 (i)~runs the Phase~1 data-preparation pipeline locally
 on their own materials (PDF lectures, PPTX decks,
@@ -1114,23 +1114,27 @@ First, GPU access spans the practical resource
 range that constrains real institutions: one
 collaborator runs on a high-end data-center GPU
 (NVIDIA A100), one on a mid-range desktop GPU
-(NVIDIA RTX~3090/4090), and two on entry-level GPUs
+(NVIDIA RTX~3090/4090), two on entry-level GPUs
 (NVIDIA T4 / RTX~2080~Ti) via a Google Colab free
-tier and personal hardware. Second, declared
+tier and personal hardware, and one whose GPU
+profile is still pending submission of the
+recruitment form (\red{TBD}, $\mathcal{I}_4$). Second, declared
 training budgets range from 10--50 to 50--200 GPU
 hours, forcing the federation to accommodate
 short-budget participants without dragging
 long-budget participants into wall-clock parity.
 Third, dataset profiles vary across size (50--200
-pages for three institutions, 200--500 for one),
-language coverage (one English-only collaborator,
-three bilingual), academic level (mixed,
-undergraduate-advanced, mixed,
-undergraduate-advanced), and privacy posture (one
+pages for three institutions, 200--500 for one,
+\red{TBD} for $\mathcal{I}_4$), language coverage
+(one English-only collaborator, three bilingual,
+$\mathcal{I}_4$ \red{TBD}), academic level (mix of
+mixed-level and undergraduate-advanced
+contributions), and privacy posture (one
 collaborator contributes fully public materials,
 one a mix of public and private with
 authorization, two contribute private institutional
-materials with full authorization). Each
+materials with full authorization, $\mathcal{I}_4$
+\red{TBD}). Each
 institution is assigned a backbone family based on
 its declared GPU tier and software preferences
 (Table~\ref{tab:client_models}). The federation
@@ -1148,10 +1152,12 @@ leaves any single institution.
 \caption{Private-testbed collaborators on the
 heterogeneity axes most relevant to the equity
 hypothesis. Identifiers are pseudonymized as
-$\mathcal{I}_0$--$\mathcal{I}_3$. ``Privacy''
+$\mathcal{I}_0$--$\mathcal{I}_4$. ``Privacy''
 denotes the privacy posture of the contributed
 curriculum; in every case the collaborator
-explicitly authorized our research use.}
+explicitly authorized our research use.
+\red{TBD} entries are pending the recruitment-form
+return for $\mathcal{I}_4$.}
 \label{tab:private_collaborators}
 \begin{tabular}{@{}lllll@{}}
 \toprule
@@ -1162,6 +1168,7 @@ $\mathcal{I}_0$ & Tunisia  & mid-range   & 200--500 & private (auth.) \\
 $\mathcal{I}_1$ & Germany  & high-end    & 50--200  & private (auth.) \\
 $\mathcal{I}_2$ & Nigeria  & entry-level & 50--200  & mixed \\
 $\mathcal{I}_3$ & Colombia & entry-level & 50--200  & public \\
+$\mathcal{I}_4$ & Peru     & \red{TBD}   & \red{TBD} & \red{TBD} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1827,12 +1834,12 @@ caption of Table~\ref{tab:headline_global}.}
 \end{tabular}
 \end{table*}
 
-\red{TODO: private testbed (4 institutions) not yet collected; cells stay as "--" until Phase~2 of the private collaboration finishes. Methods rows (FedKD/MD/DF/ET) are also TODO; those baselines have not been run yet on the public testbed either.}
+\red{TODO: private testbed (5 institutions) not yet collected; cells stay as "--" until Phase~2 of the private collaboration finishes. Methods rows (FedKD/MD/DF/ET) are also TODO; those baselines have not been run yet on the public testbed either.}
 \begin{table*}[t]
 \centering
 \small
 \caption{Equity comparison on the \textbf{private
-testbed} (\S\ref{sec:private_testbed}). Four
+testbed} (\S\ref{sec:private_testbed}). Five
 institutions (\S\ref{sec:private_testbed},
 Table~\ref{tab:private_collaborators}), six methods
 per institution: the per-institution local baseline
@@ -1884,7 +1891,15 @@ Table~\ref{tab:headline_global}.}
   & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
-\multirow{6}{*}{Mean across $\mathcal{I}_{0..3}$}
+\multirow{6}{*}{$\mathcal{I}_4$ / ProphetNet-large}
+  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multirow{6}{*}{Mean across $\mathcal{I}_{0..4}$}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
@@ -2006,6 +2021,7 @@ $\mathcal{I}_0$ (BART)        & -- & -- & -- & -- \\
 $\mathcal{I}_1$ (Flan-T5)     & -- & -- & -- & -- \\
 $\mathcal{I}_2$ (LED)         & -- & -- & -- & -- \\
 $\mathcal{I}_3$ (Pegasus-X)   & -- & -- & -- & -- \\
+$\mathcal{I}_4$ (ProphetNet)  & -- & -- & -- & -- \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -2065,6 +2081,7 @@ $\mathcal{I}_0$ & -- & -- & -- \\
 $\mathcal{I}_1$ & -- & -- & -- \\
 $\mathcal{I}_2$ & -- & -- & -- \\
 $\mathcal{I}_3$ & -- & -- & -- \\
+$\mathcal{I}_4$ & -- & -- & -- \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -2229,7 +2246,7 @@ institutional curricula.
   direct measurements of student outcomes.
   \item \textbf{Federation scale.} The empirical
   study involves three institutions in the public
-  testbed and four in the private testbed. Larger
+  testbed and five in the private testbed. Larger
   federations ($m \geq 10$) would test whether GAT
   averaging scales gracefully under more diverse
   architecture distributions; we leave this to
@@ -2246,7 +2263,7 @@ institutional curricula.
 %% ════════════════════════════════════════════════════════════
 \section*{Acknowledgments}
 
-\red{TODO: institutional / compute / funding acknowledgments; thanks to the public-testbed source materials (MIT 18.657, Stanford CS229, arXiv) and the four collaborating institutions of the private testbed for their participation; etc.}
+\red{TODO: institutional / compute / funding acknowledgments; thanks to the public-testbed source materials (MIT 18.657, Stanford CS229, arXiv) and the five collaborating institutions of the private testbed for their participation; etc.}
 
 %% ════════════════════════════════════════════════════════════
 % Custom bibliography only (no Anthology). Switch to
