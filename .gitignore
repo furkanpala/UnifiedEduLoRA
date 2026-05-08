@@ -24,11 +24,30 @@ run_example.py
 # Outputs & checkpoints
 outputs/
 **/outputs/
+experiment_outputs/
+**/experiment_outputs/
 fed_checkpoints/
 **/fed_checkpoints/
 *.pt
 *.ckpt
 example_output/
+
+# Data lives in Drive (gdrive:EquitableEdu/Furkan Pala/data/) — keep local only
+data/
+
+# Slurm artefacts — generated per job, sync to Drive instead
+slurm_logs/
+slurm-*.out
+slurm[0-9]*.out
+*.rclone.log
+
+# Legacy ad-hoc training driver (superseded by slurm/ wrappers)
+folds_2_3_master.log
+run_folds_2_and_3.sh
+
+# Local Claude state — per-machine, not shared
+.claude/settings.local.json
+.claude/.nfs*
 
 # Jupyter
 .ipynb_checkpoints/

@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(py -c \"print\\('ok'\\)\")",
-      "Bash(/c/Users/fp223/AppData/Local/Microsoft/WindowsApps/python.exe --version)"
-    ]
-  }
-}
