@@ -1600,19 +1600,30 @@ The two hypotheses (\S\ref{sec:scenario}) are
 reported separately. \S\ref{sec:results_equity} and
 \S\ref{sec:results_kti} test \textbf{H1} (equity)
 by comparing \UniEdu{} against per-institution local
-training and other federation methods. The result
-for the equity story is \emph{per-institution};
-GPT-4o does not appear as a row.
-\S\ref{sec:results_llm_approx} tests \textbf{H2}
-(LLM approximation) by aggregating \UniEdu{}'s
-output across the federation and comparing the
-aggregate against single-LLM zero-shot baselines.
-All metrics are reported as the mean over 3-fold
-cross-validation on the val set unless otherwise
-stated. Score directions: ROUGE-L / BLEU-4 /
-BERTScore-F1 / RTC / Faithfulness / QAFactEval /
-Answer-Relevancy / Bloom-EVS / LLM-judge overall are
-all higher-is-better in $[0, 1]$. RQUGE is
+training. The result for the equity story is
+\emph{per-institution}; GPT-4o does not appear as a
+row. \S\ref{sec:results_llm_approx} tests
+\textbf{H2} (LLM approximation) by aggregating
+\UniEdu{}'s output across the federation and
+comparing the aggregate against single-LLM zero-shot
+baselines. For the public testbed we evaluate on
+three slices: each client's local val set (held out
+during training and used for early stopping), each
+client's local test set (held out from training,
+in-distribution), and an
+$\mathcal{T}^{\text{global}}$ pool of $916$
+held-out chunks aggregated across all three clients
+(cross-distribution). All metrics are reported as
+the mean over 3-fold cross-validation. We report
+both the BEST checkpoint (selected on val ROUGE-L)
+and the FINAL checkpoint at the last completed
+epoch / round; the appendix
+(\S\ref{app:final_ckpt}) holds the FINAL-checkpoint
+counterparts of every main-paper table. Score
+directions: ROUGE-L / BLEU-4 / BERTScore-F1 / RTC /
+Faithfulness / QAFactEval / Answer-Relevancy /
+Bloom-EVS / LLM-judge overall are all
+higher-is-better in $[0, 1]$. RQUGE is
 higher-is-better in $[1, 5]$. The Pairwise Equity
 Score $\bar{E}$ (Eq.~\ref{eq:pairwise_equity}) is
 higher-is-better and unbounded above.
@@ -1620,76 +1631,156 @@ higher-is-better and unbounded above.
 \subsection{H1 — Equity Comparison}
 \label{sec:results_equity}
 
-We compare \UniEdu{} against \textbf{Indiv},
-\textbf{FedKD}~\citep{wu2022fedkd}, and three
-additional benchmarks (\S\ref{sec:baselines})
-on the public testbed (Table~\ref{tab:equity_public})
-and the private testbed
-(Table~\ref{tab:equity_private}).
+We compare \UniEdu{} (architecture-aware federated
+LoRA + FiLM, \S\ref{sec:framework}) against the
+per-institution local baseline \textbf{Indiv} on the
+public testbed (Table~\ref{tab:headline_global},
+Table~\ref{tab:val_test}). Federation lifts every
+lightweight metric over the individual baseline on
+the cross-distribution global test set: ROUGE-L
+improves by $+0.0087$, BLEU-4 by $+0.0119$,
+BERTScore-F1 by $+0.0040$, and the local Bloom's
+educational-value score by $+0.0041$ (mean across
+the three institutions, best checkpoint;
+Table~\ref{tab:headline_global}). The gain is
+largest for $\mathcal{I}_2$ (LED-16384, ML papers)
+--- the smallest-data, most under-represented
+institution --- where federation improves all four
+lightweight metrics simultaneously by margins of
+$+0.0166$ / $+0.0201$ / $+0.0058$ / $+0.0304$. On
+each client's own local test
+(Table~\ref{tab:val_test}, lower half), the
+individual baseline retains its specialisation
+advantage on the native distribution: Indiv wins
+ROUGE-L on $\mathcal{I}_0$ and $\mathcal{I}_1$.
+\UniEdu{}, however, still wins all four lightweight
+metrics on $\mathcal{I}_2$'s local test --- the
+federation's value is most pronounced exactly where
+local data is scarcest. Cross-architecture
+federation across BART, Flan-T5, and LED
+simultaneously, a setting prior heterogeneous-FL
+work~\citep{wu2022fedkd, li2019fedmd, lin2020feddf,
+cheng2022fedet} did not attempt, is therefore not a
+breadth tax but the very mechanism that levels the
+playing field for the data-poor client.
 
+% TODO(fp): re-run all (client, fold) cells with --no-heavy off + an
+% OpenAI key to populate the LLM-based block (RTC, Faith., QAFE, RQUGE,
+% Ans-Rel, Bloom-LLM EVS, LLM-judge overall). The current --fast-eval
+% pass produced only the four lightweight columns.
 \begin{table*}[t]
 \centering
-\small
-\caption{Equity comparison on the \textbf{public
-testbed} (\S\ref{sec:public_testbed}). Per-institution
-QA-quality metrics on the val set (mean over 3 folds).
-$\bar{E}$ is the institution's mean Pairwise Equity
-Score against the other clients in the same paradigm
-(Eq.~\ref{eq:pairwise_equity}; higher = both clients
-do well \emph{despite} resource asymmetry).
-GPT-4o is intentionally not a row here --- the
-LLM-approximation comparison is reported separately in
-Table~\ref{tab:llm_approx}. Bold = best per
-(institution, metric).}
-\label{tab:equity_public}
-\begin{tabular}{llcccccccc}
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\caption{H1 headline: \UniEdu{} vs the per-institution
+individual baseline (\textbf{Indiv}) on the
+cross-distribution \textbf{global test set}
+($\mathcal{T}^{\text{global}}$, $916$ samples
+pooled across institutions; best checkpoint, mean
+over 3 folds). Lightweight reference-based metrics
+on the left; reference-free LLM-based metrics on
+the right (\S\ref{sec:eval}). Bold = better of
+$\{\indiv, \uni\}$ per (institution, metric).}
+\label{tab:headline_global}
+\begin{tabular}{ll cccc ccccccc}
 \toprule
-\textbf{Institution} & \textbf{Method} &
-\textbf{ROUGE-L} & \textbf{BLEU-4} & \textbf{BERT-F1} &
-\textbf{RTC} & \textbf{Faith.} & \textbf{QAFactEval} &
-\textbf{RQUGE} & $\bar{E}$ \\
+\multirow{2}{*}{\textbf{Inst.}} &
+\multirow{2}{*}{\textbf{Method}} &
+\multicolumn{4}{c}{\textbf{Lightweight}} &
+\multicolumn{7}{c}{\textbf{LLM-based / reference-free}} \\
+\cmidrule(lr){3-6} \cmidrule(lr){7-13}
+& &
+\textbf{R-L} & \textbf{B-4} & \textbf{BERT} & \textbf{B\textsubscript{cls}} &
+\textbf{B\textsubscript{LLM}} & \textbf{AnsR} & \textbf{Faith} & \textbf{QAFE} &
+\textbf{RQU} & \textbf{RTC} & \textbf{LLM-J} \\
 \midrule
-\multirow{6}{*}{$\mathcal{I}_0$ (BART, MIT)}
-  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\multirow{2}{*}{$\mathcal{I}_0$ (BART, MIT)}
+  & \indiv     & 0.4290 & 0.1610 & 0.8595 & \textbf{0.2400} & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4322} & \textbf{0.1653} & \textbf{0.8604} & 0.2164 & --- & --- & --- & --- & --- & --- & --- \\
 \midrule
-\multirow{6}{*}{$\mathcal{I}_1$ (Flan-T5, Stanford)}
-  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\multirow{2}{*}{$\mathcal{I}_1$ (Flan-T5, Stanford)}
+  & \indiv     & 0.4422 & 0.1646 & 0.8623 & 0.2705 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4483} & \textbf{0.1759} & \textbf{0.8675} & \textbf{0.2758} & --- & --- & --- & --- & --- & --- & --- \\
 \midrule
-\multirow{6}{*}{$\mathcal{I}_2$ (LED, ML papers)}
-  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\multirow{2}{*}{$\mathcal{I}_2$ (LED, ML papers)}
+  & \indiv     & 0.4246 & 0.1595 & 0.8592 & 0.1627 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4412} & \textbf{0.1796} & \textbf{0.8650} & \textbf{0.1932} & --- & --- & --- & --- & --- & --- & --- \\
 \midrule
-\multirow{6}{*}{Mean across $\mathcal{I}_{0,1,2}$}
-  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
+\multirow{2}{*}{Mean across $\mathcal{I}_{0,1,2}$}
+  & \indiv     & 0.4319 & 0.1617 & 0.8603 & 0.2244 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4406} & \textbf{0.1736} & \textbf{0.8643} & \textbf{0.2284} & --- & --- & --- & --- & --- & --- & --- \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
+% TODO(fp): same back-fill applies — local val and local test cells
+% currently populated for lightweight metrics only.
+\begin{table*}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\caption{In-distribution comparison on the public
+testbed (best checkpoint, mean over 3 folds). Top
+half: each client's \textbf{local val} set; bottom
+half: each client's \textbf{local test} set. Bold =
+better of $\{\indiv, \uni\}$ per (institution,
+metric).}
+\label{tab:val_test}
+\begin{tabular}{ll cccc ccccccc}
+\toprule
+\multirow{2}{*}{\textbf{Inst.}} &
+\multirow{2}{*}{\textbf{Method}} &
+\multicolumn{4}{c}{\textbf{Lightweight}} &
+\multicolumn{7}{c}{\textbf{LLM-based / reference-free}} \\
+\cmidrule(lr){3-6} \cmidrule(lr){7-13}
+& &
+\textbf{R-L} & \textbf{B-4} & \textbf{BERT} & \textbf{B\textsubscript{cls}} &
+\textbf{B\textsubscript{LLM}} & \textbf{AnsR} & \textbf{Faith} & \textbf{QAFE} &
+\textbf{RQU} & \textbf{RTC} & \textbf{LLM-J} \\
+\midrule
+\multicolumn{13}{l}{\textit{Local val (per client)}} \\
+\midrule
+\multirow{2}{*}{$\mathcal{I}_0$}
+  & \indiv     & 0.4778 & 0.1951 & 0.8762 & \textbf{0.2088} & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4838} & \textbf{0.2052} & \textbf{0.8799} & 0.1928 & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_1$}
+  & \indiv     & 0.4851 & 0.1868 & 0.8720 & 0.2369 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4880} & \textbf{0.2019} & \textbf{0.8810} & \textbf{0.2524} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_2$}
+  & \indiv     & 0.4253 & 0.1603 & 0.8589 & 0.1737 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4405} & \textbf{0.1789} & \textbf{0.8642} & \textbf{0.2088} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{Mean}
+  & \indiv     & 0.4627 & 0.1807 & 0.8691 & 0.2064 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4708} & \textbf{0.1953} & \textbf{0.8750} & \textbf{0.2180} & --- & --- & --- & --- & --- & --- & --- \\
+\midrule
+\multicolumn{13}{l}{\textit{Local test (per client)}} \\
+\midrule
+\multirow{2}{*}{$\mathcal{I}_0$}
+  & \indiv     & \textbf{0.4793} & \textbf{0.2019} & \textbf{0.8764} & \textbf{0.2042} & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4547 & 0.1679 & 0.8704 & 0.1353 & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_1$}
+  & \indiv     & \textbf{0.4799} & \textbf{0.1829} & 0.8689 & 0.2173 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4483 & 0.1685 & \textbf{0.8725} & \textbf{0.2576} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_2$}
+  & \indiv     & 0.4206 & 0.1565 & 0.8579 & 0.1717 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4270} & \textbf{0.1612} & \textbf{0.8604} & \textbf{0.1812} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{Mean}
+  & \indiv     & \textbf{0.4599} & \textbf{0.1804} & 0.8677 & \textbf{0.1977} & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4433 & 0.1658 & \textbf{0.8678} & 0.1914 & --- & --- & --- & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+% TODO(fp): private testbed (5 institutions) not yet collected; cells stay
+% as "--" until Phase~2 of the private collaboration finishes. Methods rows
+% (FedKD/MD/DF/ET) are also TODO — those baselines have not been run yet
+% on the public testbed either.
 \begin{table*}[t]
 \centering
 \small
 \caption{Equity comparison on the \textbf{private
 testbed} (\S\ref{sec:private_testbed}). Same layout
-as Table~\ref{tab:equity_public} with five
+as Table~\ref{tab:headline_global} with five
 institutions instead of three.}
 \label{tab:equity_private}
 \begin{tabular}{llcccccccc}
@@ -1750,6 +1841,10 @@ institutions instead of three.}
 \end{tabular}
 \end{table*}
 
+% TODO(fp): Bloom-BERT EVS values for \UniEdu{} can be filled from the
+% blooms_cls_evs_mean key already present in metrics_*.json (best ckpt,
+% global test). Bloom-LLM EVS and LLM-judge columns require a re-run with
+% the OpenAI key enabled.
 \begin{table*}[t]
 \centering
 \small
@@ -1757,7 +1852,7 @@ institutions instead of three.}
 \textbf{public testbed}. Bloom-EVS is in $[0, 1]$
 (Eq.~\ref{eq:evs}); LLM-judge is the overall mean
 across the four rubric dimensions, also in $[0, 1]$.
-Same set of methods as Table~\ref{tab:equity_public}.}
+Same set of methods as Table~\ref{tab:headline_global}.}
 \label{tab:public_pedagogical}
 \begin{tabular}{llccc}
 \toprule
@@ -1792,6 +1887,8 @@ Same set of methods as Table~\ref{tab:equity_public}.}
 \end{tabular}
 \end{table*}
 
+% TODO(fp): four-dim LLM-judge breakdown not yet populated; needs the same
+% OpenAI-enabled re-run flagged for tab:headline_global.
 \begin{table}[t]
 \centering
 \footnotesize
@@ -1811,6 +1908,9 @@ $\mathcal{I}_2$ & -- & -- & -- & -- \\
 \end{tabular}
 \end{table}
 
+% TODO(fp): UniEdu-static (graph features frozen at round 0) and
+% UniEdu-noFiLM (GAT trained but not fed into the LM) ablations not yet
+% run; one-fold pilot per ablation will go here.
 \begin{table}[t]
 \centering
 \small
@@ -1834,6 +1934,7 @@ relative to full \UniEdu{} on LLM-judge overall.}
 \subsection{Per-Institution Uplift and Knowledge Transfer}
 \label{sec:results_kti}
 
+% TODO(fp): private-testbed uplift; awaits private Phase~2 outputs.
 \begin{table}[t]
 \centering
 \footnotesize
@@ -1857,6 +1958,8 @@ $\mathcal{I}_4$ (ProphetNet)  & -- & -- & -- & -- \\
 \end{tabular}
 \end{table}
 
+% TODO(fp): KTI requires per-direction held-out eval on
+% T_{k\setminus l} chunks; eval pool not yet curated.
 \begin{table}[t]
 \centering
 \small
@@ -1892,6 +1995,9 @@ $\mathcal{I}_2 \leftarrow \mathcal{I}_0$
 \subsection{Statistical Validation}
 \label{sec:results_stats}
 
+% TODO(fp): per spec, no p-values until n>>3 folds; this table is left
+% as a stub for the camera-ready when the full federation × seed grid
+% (>=10 seeds per institution) has been run.
 \begin{table}[t]
 \centering
 \small
@@ -1930,6 +2036,10 @@ template, then scoring the resulting $(q, a)$ with
 the same evaluation suite (prompt in
 Appendix~\ref{app:llm_baselines}).
 
+% TODO(fp): single-LLM zero-shot panel (GPT-4o, GPT-4o-mini,
+% Llama-3.1-8B-Inst, Qwen-2.5-7B-Inst, Mistral-7B-Inst, Gemini-1.5-Flash)
+% not yet collected; UniEdu federated-mixture row also pending the
+% OpenAI-enabled re-run.
 \begin{table*}[t]
 \centering
 \small
@@ -2360,7 +2470,7 @@ two institutions $k, l$:
 Inputs: $Q_k^{(m)}$ is institution $k$'s aggregate
 QA-quality score under paradigm $m$ (we use the
 LLM-judge overall by default; any of the metrics in
-Tables~\ref{tab:equity_public}--\ref{tab:equity_private}
+Tables~\ref{tab:headline_global}--\ref{tab:equity_private}
 also work). $\mathcal{C}_k$ is curricular richness
 (Eq.~\ref{eq:richness}), normalised to $[0, 1]$
 across the federation. $\mathcal{R}_k$ is the
@@ -2368,7 +2478,7 @@ trainable-parameter count of $k$'s SLM, normalised
 to $[0, 1]$ by dividing by the largest in the
 federation. $\varepsilon = 10^{-6}$.
 The mean PES reported as $\bar{E}$ in
-Tables~\ref{tab:equity_public}--\ref{tab:equity_private}
+Tables~\ref{tab:headline_global}--\ref{tab:equity_private}
 is $\bar{E}_k^{(m)} = \frac{1}{m-1}\sum_{l \neq k}
 E_{kl}^{(m)}$, i.e., the mean over $k$'s pairs.
 
@@ -2497,6 +2607,219 @@ table.
 \paragraph{Implementation footprint.}
 \red{TODO} insert wall-clock and OpenAI-API cost
 deltas for each baseline relative to \UniEdu{}.
+
+%% ════════════════════════════════════════════════════════════
+\section{Final-Checkpoint Results}
+\label{app:final_ckpt}
+
+% TODO(fp): same OpenAI-enabled re-run as the main paper would also fill
+% the LLM-based block here.
+\begin{table*}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\caption{Final-checkpoint counterpart of
+Table~\ref{tab:headline_global}. Public testbed,
+\textbf{global test set}, last-epoch / last-round
+state, mean over 3 folds. Bold = better of
+$\{\indiv, \uni\}$ per (institution, metric).}
+\label{tab:appendix_global_final}
+\begin{tabular}{ll cccc ccccccc}
+\toprule
+\multirow{2}{*}{\textbf{Inst.}} &
+\multirow{2}{*}{\textbf{Method}} &
+\multicolumn{4}{c}{\textbf{Lightweight}} &
+\multicolumn{7}{c}{\textbf{LLM-based / reference-free}} \\
+\cmidrule(lr){3-6} \cmidrule(lr){7-13}
+& &
+\textbf{R-L} & \textbf{B-4} & \textbf{BERT} & \textbf{B\textsubscript{cls}} &
+\textbf{B\textsubscript{LLM}} & \textbf{AnsR} & \textbf{Faith} & \textbf{QAFE} &
+\textbf{RQU} & \textbf{RTC} & \textbf{LLM-J} \\
+\midrule
+\multirow{2}{*}{$\mathcal{I}_0$ (BART, MIT)}
+  & \indiv     & \textbf{0.4284} & \textbf{0.1614} & \textbf{0.8599} & \textbf{0.2493} & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4189 & 0.1553 & 0.8576 & 0.2231 & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_1$ (Flan-T5, Stanford)}
+  & \indiv     & 0.4329 & 0.1581 & 0.8601 & 0.2951 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4356} & \textbf{0.1661} & \textbf{0.8642} & \textbf{0.3092} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_2$ (LED, ML papers)}
+  & \indiv     & \textbf{0.4308} & 0.1653 & 0.8613 & 0.1838 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4234 & \textbf{0.1673} & \textbf{0.8614} & \textbf{0.2199} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{Mean across $\mathcal{I}_{0,1,2}$}
+  & \indiv     & \textbf{0.4307} & 0.1616 & 0.8604 & 0.2428 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4260 & \textbf{0.1629} & \textbf{0.8610} & \textbf{0.2507} & --- & --- & --- & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\caption{Final-checkpoint counterpart of
+Table~\ref{tab:val_test}. Public testbed, in-distribution
+slices, last-epoch / last-round state, mean over 3
+folds. Bold = better of $\{\indiv, \uni\}$.}
+\label{tab:appendix_val_test_final}
+\begin{tabular}{ll cccc ccccccc}
+\toprule
+\multirow{2}{*}{\textbf{Inst.}} &
+\multirow{2}{*}{\textbf{Method}} &
+\multicolumn{4}{c}{\textbf{Lightweight}} &
+\multicolumn{7}{c}{\textbf{LLM-based / reference-free}} \\
+\cmidrule(lr){3-6} \cmidrule(lr){7-13}
+& &
+\textbf{R-L} & \textbf{B-4} & \textbf{BERT} & \textbf{B\textsubscript{cls}} &
+\textbf{B\textsubscript{LLM}} & \textbf{AnsR} & \textbf{Faith} & \textbf{QAFE} &
+\textbf{RQU} & \textbf{RTC} & \textbf{LLM-J} \\
+\midrule
+\multicolumn{13}{l}{\textit{Local val (per client, FINAL ckpt)}} \\
+\midrule
+\multirow{2}{*}{$\mathcal{I}_0$}
+  & \indiv     & \textbf{0.4766} & \textbf{0.1955} & \textbf{0.8767} & \textbf{0.2335} & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4689 & 0.1901 & \textbf{0.8767} & 0.2149 & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_1$}
+  & \indiv     & \textbf{0.4757} & \textbf{0.1823} & 0.8707 & \textbf{0.2622} & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4655 & 0.1798 & \textbf{0.8755} & 0.2592 & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_2$}
+  & \indiv     & \textbf{0.4306} & 0.1686 & 0.8612 & 0.1991 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4299 & \textbf{0.1715} & \textbf{0.8616} & \textbf{0.2334} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{Mean}
+  & \indiv     & \textbf{0.4610} & \textbf{0.1821} & 0.8695 & 0.2316 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4548 & 0.1805 & \textbf{0.8713} & \textbf{0.2358} & --- & --- & --- & --- & --- & --- & --- \\
+\midrule
+\multicolumn{13}{l}{\textit{Local test (per client, FINAL ckpt)}} \\
+\midrule
+\multirow{2}{*}{$\mathcal{I}_0$}
+  & \indiv     & \textbf{0.4753} & \textbf{0.1974} & \textbf{0.8790} & \textbf{0.2092} & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4441 & 0.1622 & 0.8689 & 0.1850 & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_1$}
+  & \indiv     & \textbf{0.4604} & 0.1620 & 0.8664 & 0.2601 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4496 & \textbf{0.1648} & \textbf{0.8712} & \textbf{0.2650} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_2$}
+  & \indiv     & \textbf{0.4281} & \textbf{0.1648} & \textbf{0.8602} & 0.1915 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4095 & 0.1507 & 0.8557 & \textbf{0.2155} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{Mean}
+  & \indiv     & \textbf{0.4546} & \textbf{0.1748} & \textbf{0.8685} & 0.2203 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4344 & 0.1592 & 0.8653 & \textbf{0.2218} & --- & --- & --- & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+%% ════════════════════════════════════════════════════════════
+\section{Per-Fold Breakdown of the Headline Result}
+\label{app:perfold_global}
+
+Table~\ref{tab:appendix_perfold_global_best} reports
+the per-fold values that underlie the
+mean-over-3-folds entries of the
+global-test best-checkpoint headline
+(Table~\ref{tab:headline_global}).
+Table~\ref{tab:appendix_perfold_global_final} reports
+the final-checkpoint counterpart, i.e.\ per-fold
+values for the global-test, last-epoch / last-round
+state (mean rows match the FINAL block of
+Table~\ref{tab:appendix_global_final}).
+
+\begin{table*}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{Per-fold breakdown of the headline
+\textbf{global-test, best-checkpoint} result for the
+public testbed (Table~\ref{tab:headline_global}).
+Each row reports a single fold; ``Mean'' rows match
+the entries of the headline table to 4 d.p. Bold =
+better of $\{\indiv, \uni\}$ per (institution, fold,
+metric).}
+\label{tab:appendix_perfold_global_best}
+\begin{tabular}{ll l cccc}
+\toprule
+\textbf{Inst.} & \textbf{Method} & \textbf{Fold} &
+\textbf{R-L} & \textbf{B-4} & \textbf{BERT-F1} & \textbf{Bloom\textsubscript{cls}} \\
+\midrule
+\multirow{8}{*}{$\mathcal{I}_0$ (BART, MIT)}
+  & \indiv    & 1     & 0.4277 & 0.1595 & 0.8579 & \textbf{0.2515} \\
+  & \UniEdu{} & 1     & \textbf{0.4348} & \textbf{0.1653} & \textbf{0.8616} & 0.2255 \\
+  & \indiv    & 2     & \textbf{0.4227} & \textbf{0.1594} & 0.8573 & 0.2352 \\
+  & \UniEdu{} & 2     & 0.4231 & 0.1593 & \textbf{0.8580} & 0.2352 \\
+  & \indiv    & 3     & 0.4365 & 0.1642 & \textbf{0.8632} & \textbf{0.2332} \\
+  & \UniEdu{} & 3     & \textbf{0.4386} & \textbf{0.1715} & 0.8617 & 0.1884 \\
+  & \indiv    & Mean  & 0.4290 & 0.1610 & 0.8595 & \textbf{0.2400} \\
+  & \UniEdu{} & Mean  & \textbf{0.4322} & \textbf{0.1653} & \textbf{0.8604} & 0.2164 \\
+\midrule
+\multirow{8}{*}{$\mathcal{I}_1$ (Flan-T5, Stanford)}
+  & \indiv    & 1     & 0.4488 & 0.1695 & 0.8643 & 0.2465 \\
+  & \UniEdu{} & 1     & \textbf{0.4536} & \textbf{0.1799} & \textbf{0.8689} & \textbf{0.2758} \\
+  & \indiv    & 2     & 0.4433 & 0.1685 & 0.8624 & 0.2550 \\
+  & \UniEdu{} & 2     & \textbf{0.4444} & \textbf{0.1720} & \textbf{0.8667} & \textbf{0.2819} \\
+  & \indiv    & 3     & 0.4344 & 0.1560 & 0.8601 & \textbf{0.3098} \\
+  & \UniEdu{} & 3     & \textbf{0.4470} & \textbf{0.1758} & \textbf{0.8667} & 0.2697 \\
+  & \indiv    & Mean  & 0.4422 & 0.1646 & 0.8623 & 0.2705 \\
+  & \UniEdu{} & Mean  & \textbf{0.4483} & \textbf{0.1759} & \textbf{0.8675} & \textbf{0.2758} \\
+\midrule
+\multirow{8}{*}{$\mathcal{I}_2$ (LED, ML papers)}
+  & \indiv    & 1     & 0.4284 & 0.1605 & 0.8603 & 0.1557 \\
+  & \UniEdu{} & 1     & \textbf{0.4542} & \textbf{0.1892} & \textbf{0.8685} & \textbf{0.1803} \\
+  & \indiv    & 2     & 0.4151 & 0.1491 & 0.8558 & 0.1653 \\
+  & \UniEdu{} & 2     & \textbf{0.4439} & \textbf{0.1805} & \textbf{0.8656} & \textbf{0.2092} \\
+  & \indiv    & 3     & \textbf{0.4302} & 0.1688 & \textbf{0.8614} & 0.1672 \\
+  & \UniEdu{} & 3     & 0.4255 & \textbf{0.1691} & 0.8609 & \textbf{0.1899} \\
+  & \indiv    & Mean  & 0.4246 & 0.1595 & 0.8592 & 0.1627 \\
+  & \UniEdu{} & Mean  & \textbf{0.4412} & \textbf{0.1796} & \textbf{0.8650} & \textbf{0.1932} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{Per-fold breakdown of the
+\textbf{global-test, final-checkpoint} result for
+the public testbed (sister to
+Table~\ref{tab:appendix_perfold_global_best}; means
+match Table~\ref{tab:appendix_global_final}). Bold =
+better of $\{\indiv, \uni\}$ per (institution, fold,
+metric).}
+\label{tab:appendix_perfold_global_final}
+\begin{tabular}{ll l cccc}
+\toprule
+\textbf{Inst.} & \textbf{Method} & \textbf{Fold} &
+\textbf{R-L} & \textbf{B-4} & \textbf{BERT-F1} & \textbf{Bloom\textsubscript{cls}} \\
+\midrule
+\multirow{8}{*}{$\mathcal{I}_0$ (BART, MIT)}
+  & \indiv    & 1     & \textbf{0.4240} & \textbf{0.1624} & 0.8584 & \textbf{0.2832} \\
+  & \UniEdu{} & 1     & 0.4196 & 0.1566 & 0.8584 & 0.2483 \\
+  & \indiv    & 2     & \textbf{0.4241} & \textbf{0.1584} & \textbf{0.8591} & \textbf{0.2736} \\
+  & \UniEdu{} & 2     & 0.4152 & 0.1500 & 0.8558 & 0.2424 \\
+  & \indiv    & 3     & \textbf{0.4372} & \textbf{0.1635} & \textbf{0.8622} & \textbf{0.1913} \\
+  & \UniEdu{} & 3     & 0.4220 & 0.1594 & 0.8585 & 0.1786 \\
+  & \indiv    & Mean  & \textbf{0.4284} & \textbf{0.1614} & \textbf{0.8599} & \textbf{0.2493} \\
+  & \UniEdu{} & Mean  & 0.4189 & 0.1553 & 0.8576 & 0.2231 \\
+\midrule
+\multirow{8}{*}{$\mathcal{I}_1$ (Flan-T5, Stanford)}
+  & \indiv    & 1     & 0.4328 & 0.1611 & 0.8604 & 0.2784 \\
+  & \UniEdu{} & 1     & \textbf{0.4354} & \textbf{0.1695} & \textbf{0.8647} & \textbf{0.3203} \\
+  & \indiv    & 2     & 0.4411 & 0.1626 & 0.8623 & 0.2775 \\
+  & \UniEdu{} & 2     & \textbf{0.4422} & \textbf{0.1662} & \textbf{0.8659} & \textbf{0.2806} \\
+  & \indiv    & 3     & 0.4248 & 0.1506 & 0.8575 & \textbf{0.3295} \\
+  & \UniEdu{} & 3     & \textbf{0.4291} & \textbf{0.1625} & \textbf{0.8621} & 0.3266 \\
+  & \indiv    & Mean  & 0.4329 & 0.1581 & 0.8601 & 0.2951 \\
+  & \UniEdu{} & Mean  & \textbf{0.4356} & \textbf{0.1661} & \textbf{0.8642} & \textbf{0.3092} \\
+\midrule
+\multirow{8}{*}{$\mathcal{I}_2$ (LED, ML papers)}
+  & \indiv    & 1     & \textbf{0.4334} & 0.1684 & 0.8621 & 0.1718 \\
+  & \UniEdu{} & 1     & 0.4298 & \textbf{0.1705} & \textbf{0.8631} & \textbf{0.2172} \\
+  & \indiv    & 2     & 0.4226 & 0.1568 & 0.8590 & 0.1539 \\
+  & \UniEdu{} & 2     & \textbf{0.4277} & \textbf{0.1678} & \textbf{0.8625} & \textbf{0.2253} \\
+  & \indiv    & 3     & \textbf{0.4364} & \textbf{0.1706} & \textbf{0.8627} & \textbf{0.2258} \\
+  & \UniEdu{} & 3     & 0.4127 & 0.1634 & 0.8585 & 0.2171 \\
+  & \indiv    & Mean  & \textbf{0.4308} & 0.1653 & 0.8613 & 0.1838 \\
+  & \UniEdu{} & Mean  & 0.4234 & \textbf{0.1673} & \textbf{0.8614} & \textbf{0.2199} \\
+\bottomrule
+\end{tabular}
+\end{table*}
 
 \end{document}
 
