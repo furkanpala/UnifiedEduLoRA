@@ -165,7 +165,7 @@ mixture against GPT-4o on the same contexts and
 measure QA quality across reference-based,
 reference-free, pedagogical, and LLM-judge axes,
 together with three equity-specific metrics
-(\S\ref{sec:equity}).
+(Section~\ref{sec:equity}).
 \red{TODO: tighten the H2 quantitative summary once the OpenAI-enabled comprehensive eval pass and the diverse-LLM zero-shot panel are run.}
 \end{abstract}
 
@@ -237,7 +237,7 @@ miao2021artificial}.
 \end{itemize}
 H1 is the distributional claim; H2 is the aggregate
 claim. They are tested separately in
-\S\ref{sec:experiments}.
+Section~\ref{sec:experiments}.
 
 A direct route to that goal is federated
 learning~\citep{mcmahan2017communication,
@@ -319,10 +319,10 @@ in their chosen SLM.
 We evaluate \UniEdu{} on two complementary testbeds: a
 publicly reproducible benchmark constructed from MIT
 18.657, Stanford CS229, and an arXiv ML paper corpus
-(\S\ref{sec:public_testbed}); and a real-world
+(Section~\ref{sec:public_testbed}); and a real-world
 federation of five collaborating institutions
 across five countries on three continents
-(\S\ref{sec:private_testbed}). Standard
+(Section~\ref{sec:private_testbed}). Standard
 n-gram metrics such as ROUGE and BLEU are necessary
 but not sufficient for educational AQAG, which
 demands faithfulness, pedagogical depth, and
@@ -479,7 +479,7 @@ factual support, and faithfulness without gold
 references, which is essential when evaluating
 QAs whose ``correct'' phrasing is non-unique. We
 combine all three families into the evaluation suite
-in \S\ref{sec:evaluation}.
+in Section~\ref{sec:evaluation}.
 
 \textbf{Educational equity and AI.}
 The equity implications of AI-powered educational
@@ -490,7 +490,7 @@ even when \emph{deployment} of SLMs is universal,
 \emph{quality} can still be uneven because of curricular
 and capacity differences across institutions. \UniEdu{}
 explicitly measures the per-institution uplift from
-federation (\S\ref{sec:equity}), so the equity
+federation (Section~\ref{sec:equity}), so the equity
 conversation can be grounded in evaluable numbers
 rather than aspiration.
 
@@ -999,13 +999,13 @@ protocol.
 
 We evaluate \UniEdu{} on two complementary testbeds.
 The \emph{public testbed}
-(\S\ref{sec:public_testbed}) fixes a publicly
+(Section~\ref{sec:public_testbed}) fixes a publicly
 reproducible federation built from openly available
 ML lecture notes and an arXiv ML paper corpus. It
 isolates the effect of architectural heterogeneity
 under controlled data conditions and lets external
 researchers reproduce the framework end-to-end. The
-\emph{private testbed} (\S\ref{sec:private_testbed})
+\emph{private testbed} (Section~\ref{sec:private_testbed})
 runs the same framework across five real
 collaborating institutions in Tunisia, Germany,
 Nigeria, Colombia, and Peru training on their own
@@ -1014,11 +1014,11 @@ and stylistic heterogeneity that real
 deployments exhibit.
 
 For both testbeds we share the same model zoo
-(\S\ref{sec:models}), training procedure
-(\S\ref{sec:training}), baselines
-(\S\ref{sec:baselines}), and evaluation suite
-(\S\ref{sec:evaluation}). We report results on val
-splits (\S\ref{sec:results}); test splits are held
+(Section~\ref{sec:models}), training procedure
+(Section~\ref{sec:training}), baselines
+(Section~\ref{sec:baselines}), and evaluation suite
+(Section~\ref{sec:evaluation}). We report results on val
+splits (Section~\ref{sec:results}); test splits are held
 out for cross-testbed comparisons in future work.
 
 \subsection{Public Testbed: Open ML Curricula}
@@ -1226,20 +1226,20 @@ forward.
 
 \textbf{Conditioning regimes.} Each institution
 trains its SLM under three prompt-conditioning
-regimes (\S\ref{sec:conditioning}): \texttt{baseline}
+regimes (Section~\ref{sec:conditioning}): \texttt{baseline}
 (context only, with diverse beam search and
 Hungarian-matched references at evaluation),
 \texttt{topic} (prompt embeds the QA's
 \texttt{question\_topic}), and \texttt{bloom} (prompt
 embeds the QA's Bloom level and corresponding
 cognitive verb). All three are evaluated separately;
-the comparisons in \S\ref{sec:results} use
+the comparisons in Section~\ref{sec:results} use
 \texttt{topic} unless otherwise stated.
 
 \textbf{Federated optimization.} \UniEdu{} runs $T=33$
 federation rounds with $3$ local epochs per round and
 sample-size-weighted FedAvg of the GAT parameters
-$\boldsymbol{\phi}$ (\S\ref{sec:fed_opt}). The total
+$\boldsymbol{\phi}$ (Section~\ref{sec:fed_opt}). The total
 effective passes per client $\approx 99$, comparable
 to the individual baseline. We use a single best-
 checkpoint snapshot at the round with the lowest
@@ -1276,7 +1276,7 @@ conditioned on additional fields:
 \subsection{Baselines}
 \label{sec:baselines}
 
-The two hypotheses in \S\ref{sec:scenario} require
+The two hypotheses in Section~\ref{sec:scenario} require
 distinct sets of comparators.
 
 \paragraph{For H1 (equity).}
@@ -1289,7 +1289,7 @@ the same val set:
   institution trains its SLM with a private LoRA
   adapter on its own data, with no federation. Three
   conditioning regimes per institution
-  (\S\ref{sec:conditioning}).
+  (Section~\ref{sec:conditioning}).
   \item \textbf{FedKD}~\citep{wu2022fedkd}.
   Communication-efficient federated learning via
   knowledge distillation: each client trains a small
@@ -1305,7 +1305,7 @@ the same val set:
   back into their local SLM. Architectural
   heterogeneity is handled by-design because clients
   exchange logits rather than parameters. We use the
-  public-testbed chunks (\S\ref{sec:public_testbed})
+  public-testbed chunks (Section~\ref{sec:public_testbed})
   as the shared dataset. \red{TODO: implement FedMD in \texttt{unifiedfl/}.}
   \item \textbf{FedDF}~\citep{lin2020feddf}.
   Server-side ensemble distillation on an unlabeled
@@ -1359,7 +1359,7 @@ the same evaluation suite:
   \item \textbf{Gemini-1.5-Flash}.
 \end{itemize}
 The H2 panel is reported separately
-(\S\ref{sec:results_llm_approx},
+(Section~\ref{sec:results_llm_approx},
 Appendix~\ref{app:llm_baselines}); these LLMs do not
 appear as rows in the per-institution H1 tables.
 
@@ -1647,13 +1647,13 @@ size, and \textbf{95\,\% bootstrap CIs}
 \section{Results}
 \label{sec:results}
 
-The two hypotheses (\S\ref{sec:scenario}) are
-reported separately. \S\ref{sec:results_equity} and
-\S\ref{sec:results_kti} test \textbf{H1} (equity)
+The two hypotheses (Section~\ref{sec:scenario}) are
+reported separately. Section~\ref{sec:results_equity} and
+Section~\ref{sec:results_kti} test \textbf{H1} (equity)
 by comparing \UniEdu{} against per-institution local
 training. The result for the equity story is
 \emph{per-institution}; GPT-4o does not appear as a
-row. \S\ref{sec:results_llm_approx} tests
+row. Section~\ref{sec:results_llm_approx} tests
 \textbf{H2} (LLM approximation) by aggregating
 \UniEdu{}'s output across the federation and
 comparing the aggregate against single-LLM zero-shot
@@ -1669,7 +1669,7 @@ the mean over 3-fold cross-validation. We report
 both the BEST checkpoint (selected on val ROUGE-L)
 and the FINAL checkpoint at the last completed
 epoch / round; the appendix
-(\S\ref{app:final_ckpt}) holds the FINAL-checkpoint
+(Section~\ref{app:final_ckpt}) holds the FINAL-checkpoint
 counterparts of every main-paper table. Score
 directions: ROUGE-L / BLEU-4 / BERTScore-F1 / RTC /
 Faithfulness / QAFactEval / Answer-Relevancy /
@@ -1683,7 +1683,7 @@ higher-is-better and unbounded above.
 \label{sec:results_equity}
 
 We compare \UniEdu{} (architecture-aware federated
-LoRA + FiLM, \S\ref{sec:method}) against the
+LoRA + FiLM, Section~\ref{sec:method}) against the
 per-institution local baseline \textbf{Indiv} on the
 public testbed (Table~\ref{tab:headline_global},
 Table~\ref{tab:val_test}). Federation lifts every
@@ -1728,7 +1728,7 @@ cross-distribution \textbf{global test set}
 pooled across institutions; best checkpoint, mean
 over 3 folds). Lightweight reference-based metrics
 on the left; reference-free LLM-based metrics on
-the right (\S\ref{sec:evaluation}). Bold = better of
+the right (Section~\ref{sec:evaluation}). Bold = better of
 $\{\indiv, \uni\}$ per (institution, metric).
 \textbf{Column abbreviations.} R-L: ROUGE-L F1.
 B-4: BLEU-4. BERT: BERTScore-F1.
@@ -1839,11 +1839,11 @@ caption of Table~\ref{tab:headline_global}.}
 \centering
 \small
 \caption{Equity comparison on the \textbf{private
-testbed} (\S\ref{sec:private_testbed}). Five
-institutions (\S\ref{sec:private_testbed},
+testbed} (Section~\ref{sec:private_testbed}). Five
+institutions (Section~\ref{sec:private_testbed},
 Table~\ref{tab:private_collaborators}), six methods
 per institution: the per-institution local baseline
-\textbf{Indiv} (\S\ref{sec:baselines}), four
+\textbf{Indiv} (Section~\ref{sec:baselines}), four
 heterogeneous-FL distillation baselines
 \textbf{FedKD}~\citep{wu2022fedkd},
 \textbf{FedMD}~\citep{li2019fedmd},
@@ -1918,7 +1918,7 @@ Table~\ref{tab:headline_global}.}
 \textbf{public testbed}. Bloom-EVS is in $[0, 1]$
 (Eq.~\ref{eq:evs}); LLM-judge is the overall mean
 across the four rubric dimensions, also in $[0, 1]$.
-Method rows: \textbf{Indiv} (\S\ref{sec:baselines}),
+Method rows: \textbf{Indiv} (Section~\ref{sec:baselines}),
 \textbf{FedKD}~\citep{wu2022fedkd},
 \textbf{FedMD}~\citep{li2019fedmd},
 \textbf{FedDF}~\citep{lin2020feddf},
@@ -2278,7 +2278,7 @@ institutional curricula.
 \label{app:llm_judge_prompt}
 
 The full prompt sent to the GPT-4o LLM QA-quality judge
-(\S\ref{sec:llm_judge}) is reproduced below verbatim. At
+(Section~\ref{sec:llm_judge}) is reproduced below verbatim. At
 inference time the placeholders
 \texttt{\{context\}}, \texttt{\{question\}}, and
 \texttt{\{answer\}} are substituted with the source
@@ -2528,7 +2528,7 @@ graph our constructor builds (nodes colored by
 layer-type ID, edges in forward order). The graphs
 have $|\mathcal{V}_k| \in [\sim\!200, \sim\!500]$
 nodes depending on backbone size; node feature
-vectors are 16-dimensional (\S\ref{sec:arch_graph}).
+vectors are 16-dimensional (Section~\ref{sec:arch_graph}).
 
 \red{TODO: insert one graph figure per family (BART, Flan-T5, LED, Pegasus-X, ProphetNet) generated via \texttt{unifiedfl/visualize\_graph.py}.}
 
@@ -2578,7 +2578,7 @@ qualitative failure modes.
 \label{app:equity_derivations}
 
 We provide derivations and implementation notes for
-the three equity metrics in \S\ref{sec:equity}: the
+the three equity metrics in Section~\ref{sec:equity}: the
 \emph{Pairwise Equity Score} $E_{kl}^{(m)}$
 (Eq.~\ref{eq:pairwise_equity}), the
 \emph{Knowledge Transfer Index}
@@ -2684,7 +2684,7 @@ projections.
 FedMD, FedDF, and FedET require an unlabeled
 public dataset for their distillation step. We use
 the public-testbed chunks
-(\S\ref{sec:public_testbed}) as that dataset: each
+(Section~\ref{sec:public_testbed}) as that dataset: each
 client computes its outputs (logits or hidden
 states, depending on the method) on these chunks
 and exchanges only those, never raw curricular
