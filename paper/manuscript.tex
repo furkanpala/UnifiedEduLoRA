@@ -320,8 +320,9 @@ We evaluate \UniEdu{} on two complementary testbeds: a
 publicly reproducible benchmark constructed from MIT
 18.657, Stanford CS229, and an arXiv ML paper corpus
 (\S\ref{sec:public_testbed}); and a real-world
-federation of five institutions training on private
-curricula (\S\ref{sec:private_testbed}). Standard
+federation of four collaborating institutions
+across four countries on three continents
+(\S\ref{sec:private_testbed}). Standard
 n-gram metrics such as ROUGE and BLEU are necessary
 but not sufficient for educational AQAG, which
 demands faithfulness, pedagogical depth, and
@@ -356,7 +357,8 @@ against GPT-4o as the single-LLM ceiling.
   per-institution uplift from federation.
   \item \textbf{Two-testbed empirical study} on a
   publicly reproducible benchmark and on a real-world
-  federation of five institutions, comparing
+  federation of four institutions spanning Tunisia,
+  Germany, Nigeria, and Colombia, comparing
   \UniEdu{} against per-institution local baselines
   and a GPT-4o ceiling.
 \end{enumerate}
@@ -1004,9 +1006,10 @@ isolates the effect of architectural heterogeneity
 under controlled data conditions and lets external
 researchers reproduce the framework end-to-end. The
 \emph{private testbed} (\S\ref{sec:private_testbed})
-runs the same framework across five real
-collaborating institutions training on their own
-private curricula, with the sample-size, vocabulary,
+runs the same framework across four real
+collaborating institutions in Tunisia, Germany,
+Nigeria, and Colombia training on their own private
+curricula, with the sample-size, vocabulary,
 and stylistic heterogeneity that real
 deployments exhibit.
 
@@ -1086,28 +1089,82 @@ data quantity or of the GAT-mediated transfer
 \label{sec:private_testbed}
 
 The private testbed instantiates \UniEdu{} across
-\textbf{five real collaborating institutions} that
-each contribute their own private machine-learning
-curricula. Concretely, each collaborator
+\textbf{four real collaborating institutions}
+spanning four countries on three continents
+(Tunisia, Germany, Nigeria, and Colombia), each
+contributing its own private machine-learning
+curriculum. Concretely, each collaborator
 (i)~runs the Phase~1 data-preparation pipeline locally
 on their own materials (PDF lectures, PPTX decks,
-research papers), producing a JSON file conforming to
-the same schema as the public testbed; (ii)~validates
-their file with our schema validator; (iii)~generates
-deterministic 3-fold CV splits with the shared seed
-$=42$; and (iv)~ships only the resulting checksum
-file to the coordinator for cross-collaborator
-reproducibility verification. \emph{No raw
-curricular data, no QA pairs, and no model weights
-ever cross institutional boundaries.}
+textbook chapters, course assignments, research
+papers), producing a JSON file conforming to the
+same schema as the public testbed; (ii)~validates
+their file with our schema validator;
+(iii)~generates deterministic 3-fold CV splits with
+the shared seed $=42$; and (iv)~ships only the
+resulting checksum file to the coordinator for
+cross-collaborator reproducibility verification.
+\emph{No raw curricular data, no QA pairs, and no
+model weights ever cross institutional boundaries.}
 
-The five institutions are assigned different SLM
-backbones based on declared GPU resources and
-software preferences (Table~\ref{tab:client_models}),
-prioritising architectural diversity. The federation
-involves no central training corpus; each
-institution's training data is its own.
-\red{TODO: institutional names (or anonymous IDs $\mathcal{I}_0,\dots,\mathcal{I}_4$); recruitment-form demographic figure; per-institution chunk and QA-pair counts; topic-coverage histograms.}
+The institutions are deliberately heterogeneous on
+three axes that are central to the equity
+hypothesis (Table~\ref{tab:private_collaborators}).
+First, GPU access spans the practical resource
+range that constrains real institutions: one
+collaborator runs on a high-end data-center GPU
+(NVIDIA A100), one on a mid-range desktop GPU
+(NVIDIA RTX~3090/4090), and two on entry-level GPUs
+(NVIDIA T4 / RTX~2080~Ti) via a Google Colab free
+tier and personal hardware. Second, declared
+training budgets range from 10--50 to 50--200 GPU
+hours, forcing the federation to accommodate
+short-budget participants without dragging
+long-budget participants into wall-clock parity.
+Third, dataset profiles vary across size (50--200
+pages for three institutions, 200--500 for one),
+language coverage (one English-only collaborator,
+three bilingual), academic level (mixed,
+undergraduate-advanced, mixed,
+undergraduate-advanced), and privacy posture (one
+collaborator contributes fully public materials,
+one a mix of public and private with
+authorization, two contribute private institutional
+materials with full authorization). Each
+institution is assigned a backbone family based on
+its declared GPU tier and software preferences
+(Table~\ref{tab:client_models}). The federation
+involves no central training corpus, no shared
+evaluation pool of raw text, and no exchange of
+participant identities; the per-institution
+profiles in Table~\ref{tab:private_collaborators}
+are the only collaborator-level information that
+leaves any single institution.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{Private-testbed collaborators on the
+heterogeneity axes most relevant to the equity
+hypothesis. Identifiers are pseudonymized as
+$\mathcal{I}_0$--$\mathcal{I}_3$. ``Privacy''
+denotes the privacy posture of the contributed
+curriculum; in every case the collaborator
+explicitly authorized our research use.}
+\label{tab:private_collaborators}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{Inst.} & \textbf{Country} & \textbf{GPU tier}
+& \textbf{Pages} & \textbf{Privacy} \\
+\midrule
+$\mathcal{I}_0$ & Tunisia  & mid-range   & 200--500 & private (auth.) \\
+$\mathcal{I}_1$ & Germany  & high-end    & 50--200  & private (auth.) \\
+$\mathcal{I}_2$ & Nigeria  & entry-level & 50--200  & mixed \\
+$\mathcal{I}_3$ & Colombia & entry-level & 50--200  & public \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Model Zoo}
 \label{sec:models}
@@ -1770,16 +1827,17 @@ caption of Table~\ref{tab:headline_global}.}
 \end{tabular}
 \end{table*}
 
-\red{TODO: private testbed (5 institutions) not yet collected; cells stay as "--" until Phase~2 of the private collaboration finishes. Methods rows (FedKD/MD/DF/ET) are also TODO — those baselines have not been run yet on the public testbed either.}
+\red{TODO: private testbed (4 institutions) not yet collected; cells stay as "--" until Phase~2 of the private collaboration finishes. Methods rows (FedKD/MD/DF/ET) are also TODO; those baselines have not been run yet on the public testbed either.}
 \begin{table*}[t]
 \centering
 \small
 \caption{Equity comparison on the \textbf{private
-testbed} (\S\ref{sec:private_testbed}). Five
-institutions, six methods per institution: the
-per-institution local baseline \textbf{Indiv}
-(\S\ref{sec:baselines}), four heterogeneous-FL
-distillation baselines
+testbed} (\S\ref{sec:private_testbed}). Four
+institutions (\S\ref{sec:private_testbed},
+Table~\ref{tab:private_collaborators}), six methods
+per institution: the per-institution local baseline
+\textbf{Indiv} (\S\ref{sec:baselines}), four
+heterogeneous-FL distillation baselines
 \textbf{FedKD}~\citep{wu2022fedkd},
 \textbf{FedMD}~\citep{li2019fedmd},
 \textbf{FedDF}~\citep{lin2020feddf}, and
@@ -1826,15 +1884,7 @@ Table~\ref{tab:headline_global}.}
   & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
-\multirow{6}{*}{$\mathcal{I}_4$ / ProphetNet-large}
-  & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedDF          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & FedET          & -- & -- & -- & -- & -- & -- & -- & -- \\
-  & \UniEdu{}      & -- & -- & -- & -- & -- & -- & -- & -- \\
-\midrule
-\multirow{6}{*}{Mean across $\mathcal{I}_{0..4}$}
+\multirow{6}{*}{Mean across $\mathcal{I}_{0..3}$}
   & Indiv          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedKD          & -- & -- & -- & -- & -- & -- & -- & -- \\
   & FedMD          & -- & -- & -- & -- & -- & -- & -- & -- \\
@@ -1956,7 +2006,6 @@ $\mathcal{I}_0$ (BART)        & -- & -- & -- & -- \\
 $\mathcal{I}_1$ (Flan-T5)     & -- & -- & -- & -- \\
 $\mathcal{I}_2$ (LED)         & -- & -- & -- & -- \\
 $\mathcal{I}_3$ (Pegasus-X)   & -- & -- & -- & -- \\
-$\mathcal{I}_4$ (ProphetNet)  & -- & -- & -- & -- \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -2016,7 +2065,6 @@ $\mathcal{I}_0$ & -- & -- & -- \\
 $\mathcal{I}_1$ & -- & -- & -- \\
 $\mathcal{I}_2$ & -- & -- & -- \\
 $\mathcal{I}_3$ & -- & -- & -- \\
-$\mathcal{I}_4$ & -- & -- & -- \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -2181,7 +2229,7 @@ institutional curricula.
   direct measurements of student outcomes.
   \item \textbf{Federation scale.} The empirical
   study involves three institutions in the public
-  testbed and five in the private testbed. Larger
+  testbed and four in the private testbed. Larger
   federations ($m \geq 10$) would test whether GAT
   averaging scales gracefully under more diverse
   architecture distributions; we leave this to
@@ -2198,7 +2246,7 @@ institutional curricula.
 %% ════════════════════════════════════════════════════════════
 \section*{Acknowledgments}
 
-\red{TODO: institutional / compute / funding acknowledgments; thanks to the public-testbed source materials (MIT 18.657, Stanford CS229, arXiv) and the five collaborating institutions of the private testbed for their participation; etc.}
+\red{TODO: institutional / compute / funding acknowledgments; thanks to the public-testbed source materials (MIT 18.657, Stanford CS229, arXiv) and the four collaborating institutions of the private testbed for their participation; etc.}
 
 %% ════════════════════════════════════════════════════════════
 % Custom bibliography only (no Anthology). Switch to
