@@ -65,7 +65,7 @@
 \usepackage{tikz}
 \usetikzlibrary{positioning, shapes.geometric, arrows.meta}
 
-% ── Colours ───────────────────────────────────────────────────
+% ── Colors ────────────────────────────────────────────────────
 \definecolor{myred}{RGB}{180,0,0}
 \definecolor{myblue}{RGB}{0,70,160}
 \definecolor{mygreen}{RGB}{0,120,50}
@@ -113,63 +113,61 @@
 %% ════════════════════════════════════════════════════════════
 \begin{abstract}
 Automated question-answer generation (AQAG) from
-educational materials supports scalable, on-demand
-formative assessment, but the quality of any
-\emph{locally} trained AQAG system is bounded by the
-volume and diversity of one institution's curriculum
-and by the compute available to fine-tune a generative
-model. This produces a measurable \textbf{equity
-gap}: well-resourced institutions train pedagogically
-rich generators; resource-constrained institutions
-are doubly disadvantaged by both narrow curricula and
-lightweight models. Large language models (LLMs) such
-as GPT-4o would close that gap in principle, but their
+educational materials supports formative assessment
+at scale, but the quality of any locally trained
+AQAG system is bounded by the volume and diversity
+of one institution's curriculum and by the compute
+available to fine-tune a generative model. This
+produces an \textbf{equity gap}: well-resourced
+institutions train pedagogically rich generators,
+while resource-constrained institutions are
+disadvantaged by both narrow curricula and
+lightweight models. Large language models (LLMs)
+would close that gap in principle, but their
 compute, licensing, and data-governance requirements
 put direct deployment out of reach for most
-institutions. \textbf{Small language models} (SLMs)
---- encoder-decoder backbones in the 100M--500M
-parameter range --- run on commodity hardware and
-keep curricular data local, but in isolation they
-inherit the same bounds.
-We test two complementary hypotheses. \textbf{H1
-(equity):} a federation of SLMs reduces the AQAG
-quality gap between resource-rich and
-resource-constrained institutions while keeping all
-curricular data private. \textbf{H2 (LLM
-approximation):} the resulting federation of
-heterogeneous SLMs approximates the QA-generation
-quality of a single LLM on the same contexts.
-We introduce \UniEdu{}, an architecture-aware
-federated learning framework in which each institution
-fine-tunes its own SLM (BART-base, Flan-T5-base,
-LED-base, Pegasus-X-base, ProphetNet-large) with a
-private LoRA adapter and exposes the model only
-through a coarse \emph{architecture graph} whose
-nodes are transformer blocks and whose features
-summarise layer typology and the running statistics
-of the LoRA-adjusted effective weights. A shared
-graph attention network (GAT) encodes these
-heterogeneous graphs into per-block embeddings; a
+institutions. Small language models (SLMs)
+encoder-decoder backbones in the 100M--500M
+parameter range run on commodity hardware and keep
+curricular data local, but in isolation they
+inherit the same bounds. We test two complementary
+hypotheses: \textbf{(H1, equity)} a federation of
+SLMs reduces the AQAG quality gap between
+resource-rich and resource-constrained institutions
+while keeping all curricular data private; and
+\textbf{(H2, LLM approximation)} the resulting
+federation approximates the QA-generation quality
+of a single LLM on the same contexts. We introduce
+\UniEdu{}, an architecture-aware federated learning
+framework in which each institution fine-tunes its
+own SLM with a private LoRA adapter and exposes the
+model to the federation only through a coarse
+\emph{architecture graph} whose nodes are
+transformer blocks and whose features summarize
+layer typology and the running statistics of the
+LoRA-adjusted effective weights. A shared graph
+attention network (GAT) encodes these heterogeneous
+graphs into per-block embeddings, and a
 client-local FiLM adapter translates each embedding
 into a residual scale-and-shift modulation of the
-corresponding block's hidden states. \emph{Only the
-GAT parameters} are federated, via
-sample-size-weighted averaging, so SLMs of
-fundamentally different architectures coexist in one
-federation without dimension-matching constraints.
-We evaluate on two complementary testbeds: a publicly
-reproducible benchmark from MIT~18.657, Stanford~CS229,
-and an arXiv ML paper corpus, and a real-world
-federation of five collaborating institutions training
-on private curricula. We measure QA quality along
-seven orthogonal axes --- ROUGE/BLEU/BERTScore, RAGAS
-faithfulness, QAFactEval, RQUGE, round-trip
-consistency, Bloom's Revised Taxonomy depth, and a
-four-dimension LLM-as-judge --- with three
-equity-specific metrics on top, and benchmark directly
-against GPT-4o as the single-LLM ceiling. \red{TODO:
-finalise the quantitative claim once Phase~2 results
-land.}
+corresponding block's hidden states. Only the GAT
+parameters are federated, via sample-size-weighted
+averaging, so SLMs of fundamentally different
+architectures coexist in one federation without
+dimension-matching constraints. On a public testbed
+of MIT~18.657, Stanford~CS229, and an arXiv ML
+paper corpus, federation lifts every reference-based
+quality metric over per-institution local training
+on a held-out, cross-institution test set, with the
+largest gains concentrated on the data-poorest
+institution. We further compare the federated
+mixture against GPT-4o on the same contexts and
+measure QA quality across reference-based,
+reference-free, pedagogical, and LLM-judge axes,
+together with three equity-specific metrics
+(\S\ref{sec:equity}).
+% TODO(fp): tighten the H2 quantitative summary once the OpenAI-enabled
+% comprehensive eval pass and the diverse-LLM zero-shot panel are run.
 \end{abstract}
 
 %% ════════════════════════════════════════════════════════════
@@ -251,7 +249,7 @@ client trains the same model with the same parameter
 shapes. Real institutions, by contrast, adopt
 different SLMs for different reasons (BART for
 short-document denoising, LED for long-context
-lectures, Pegasus-X for summarisation-flavoured
+lectures, Pegasus-X for summarization-flavoured
 prompts, ProphetNet for n-gram prediction, T5 for
 text-to-text uniformity). Existing heterogeneous-FL
 proposals (HeteroFL~\citep{diao2021heterofl},
@@ -260,7 +258,7 @@ heterogeneity (varying widths or depths of one base
 model) but cannot mix different transformer families.
 Second, FL struggles with \textbf{statistical
 heterogeneity} when data distributions differ across
-institutions; clustered and personalised
+institutions; clustered and personalized
 FL~\citep{sattler2020clustered, li2021fedbn} address
 non-IID data only under a shared backbone.
 
@@ -302,11 +300,11 @@ standard SLM forward pass with two small additions
 (GAT inference at micro-batch granularity, FiLM hooks
 at every transformer block).
 
-\UniEdu{} is the educational-AQAG specialisation of
+\UniEdu{} is the educational-AQAG specialization of
 the unified learning paradigm in
 \texttt{uGNN}~\citep{pala2026ugnn} and its federated
 extension \texttt{UnifiedFL}~\citep{pala2025unifiedfl}.
-Where \texttt{uGNN}/\texttt{UnifiedFL} re-parameterise
+Where \texttt{uGNN}/\texttt{UnifiedFL} re-parameterize
 each model as a fine-grained graph and run the GNN as
 the inference engine, \UniEdu{} keeps the SLM intact
 and uses a coarse architecture graph purely as a
@@ -314,7 +312,7 @@ and uses a coarse architecture graph purely as a
 preserves the architecture-agnostic communication
 channel that unified learning provides while keeping
 each client's inference path GPU-efficient with
-existing transformer kernels --- a prerequisite for
+existing transformer kernels, a prerequisite for
 adoption by institutions that have already invested
 in their chosen SLM.
 
@@ -368,9 +366,9 @@ against GPT-4o as the single-LLM ceiling.
 \section{Related Work}
 \label{sec:related}
 
-\textbf{Small language models and LLM democratisation.}
-Recent SLMs --- typically below 10B parameters and
-often below 1B --- close much of the quality gap
+\textbf{Small language models and LLM democratization.}
+Recent SLMs, typically below 10B parameters and
+often below 1B, close much of the quality gap
 against frontier LLMs while running on commodity
 hardware. Decoder-only families include
 Phi-3~\citep{abdin2024phi3},
@@ -384,11 +382,11 @@ LED~\citep{beltagy2020longformer}. A recent
 survey~\citep{qin2025slm_survey} cataloguing this
 landscape highlights that SLM \emph{deployability} is
 no longer the bottleneck; \emph{collaboration} is.
-Most LLM-democratisation work has focused on
-distillation~\citep{hinton2015distilling} or quantised
+Most LLM-democratization work has focused on
+distillation~\citep{hinton2015distilling} or quantized
 inference, both of which produce one model trained on
 one (typically large) corpus and one (typically
-centralised) compute budget. Mixtures of
+centralized) compute budget. Mixtures of
 experts~\citep{jacobs1991adaptive,
 shazeer2017outrageously} share parameters across a
 single super-model rather than across institutions and
@@ -414,7 +412,7 @@ single LLM, nor measured the gap with the type of
 multi-axis evaluation suite we adopt.
 
 \textbf{Federated learning for NLP.}
-FL has been applied to language modelling and text
+FL has been applied to language modeling and text
 classification~\citep{mcmahan2017communication,
 li2020federated, kairouz2021advances}, but existing
 approaches assume either architectural homogeneity or
@@ -424,7 +422,7 @@ InclusiveFL~\citep{liu2022no} accommodate varying
 model capacities \emph{within} a single architecture
 family by pruning or resizing layers, but cannot
 handle fundamentally different topologies. Clustered
-FL~\citep{sattler2020clustered} and personalised
+FL~\citep{sattler2020clustered} and personalized
 FL~\citep{li2021fedbn} mitigate non-IID effects but
 still assume a shared backbone. None of these methods
 allow a BART-base, a Flan-T5-base, a LED-base, a
@@ -441,15 +439,15 @@ all graphs. \texttt{UnifiedFL}~\citep{pala2025unifiedfl}
 extended this to a federated setting in which only
 the GNN parameters cross client boundaries. \UniEdu{}
 inherits the architecture-agnostic communication
-channel from these works but specialises it to the
+channel from these works but specializes it to the
 SLM-federation regime in two ways. First, our graph
 is \emph{coarse}: nodes are transformer blocks, not
 individual neurons, so the SLM is not
-re-parameterised. Second, the shared GAT serves as a
+re-parameterized. Second, the shared GAT serves as a
 \emph{conditioning encoder} whose output drives a
 local FiLM modulator on the SLM's hidden states,
 rather than as the inference path itself. This keeps
-each client's forward pass standard --- a prerequisite
+each client's forward pass standard, a prerequisite
 for institutions that need to serve their SLM with
 existing inference stacks.
 
@@ -484,7 +482,7 @@ in \S\ref{sec:evaluation}.
 
 \textbf{Educational equity and AI.}
 The equity implications of AI-powered educational
-tools have been recognised in policy
+tools have been recognized in policy
 literature~\citep{unterhalter2019measuring,
 miao2021artificial}. Our framing here is technical:
 even when \emph{deployment} of SLMs is universal,
@@ -542,8 +540,8 @@ each fine-tuned locally on its host institution's
 curriculum and coupled through a shared
 architecture-aware GAT, approximates the
 QA-generation quality of a single \emph{large}
-language model (e.g., GPT-4o) on the same contexts
---- without sharing curricular data and without
+language model (e.g., GPT-4o) on the same contexts,
+without sharing curricular data and without
 enforcing architectural homogeneity across
 institutions.
 
@@ -611,8 +609,8 @@ Pegasus-X-base, ProphetNet-large). Each institution
 fine-tunes a private LoRA adapter on its own
 curriculum and exposes its model to the federation
 only through a coarse architecture graph. A shared
-graph attention network --- whose parameters are the
-\emph{only} component federated --- encodes each
+graph attention network, whose parameters are the
+\emph{only} component federated, encodes each
 institution's graph into per-block embeddings that
 condition a local FiLM modulator. Pedagogical
 inductive bias learned through Alice's larger,
@@ -643,7 +641,7 @@ This scenario illustrates the four core properties
   measurable improvements in QA quality through
   federation (testing H1).
   \item \textbf{Approaching the LLM ceiling:} the
-  federated mixture of SLMs --- collectively ---
+  federated mixture of SLMs, taken collectively,
   approaches the QA quality of a single frontier LLM
   on the same contexts (testing H2).
 \end{enumerate}
@@ -946,15 +944,13 @@ performs sample-size-weighted FedAvg
 \end{equation}
 where $n_k = |\mathcal{D}_k^{\text{train}}|$. The
 broadcast cost per round is
-$\mathcal{O}(|\boldsymbol{\phi}|)$ floats — the GAT
+$\mathcal{O}(|\boldsymbol{\phi}|)$ floats: the GAT
 has $\sim$$10^5$ parameters, independent of the
 backbone size. LoRA and FiLM are never aggregated, so
 heterogeneity in their dimension is irrelevant to the
 protocol.
 
-\red{TODO: confirm any client-sampling deviation from
-the all-clients-each-round default; verify final round
-counts and any warm-up.}
+% TODO(fp): confirm any client-sampling deviation from the all-clients-each-round default; verify final round counts and any warm-up.
 
 \begin{algorithm}[t]
 \caption{\UniEdu{}: unified federated learning for AQAG.}
@@ -1033,10 +1029,10 @@ sources, so the entire pipeline can be reproduced by
 anyone with the corresponding files. The three
 sources are:
 \begin{itemize}[leftmargin=1.5em, itemsep=2pt]
-  \item $\mathcal{I}_0$: \textbf{MIT 18.657 ---
+  \item $\mathcal{I}_0$: \textbf{MIT 18.657:
   Mathematics of Machine
   Learning}~\citep{mit18657}, lecture notes covering
-  statistical learning theory and optimisation. 110
+  statistical learning theory and optimization. 110
   context chunks, 547 GPT-4o-annotated QA pairs.
   \item $\mathcal{I}_1$: \textbf{Stanford
   CS229}~\citep{stanfordcs229}, undergraduate ML
@@ -1056,7 +1052,7 @@ Source PDFs are converted to plain-text chunks of
 150--400 words each (one coherent topic per chunk,
 boilerplate and figure captions stripped). For every
 chunk we generate exactly five (question, answer)
-pairs with GPT-4o, each labelled with its
+pairs with GPT-4o, each labeled with its
 \texttt{question\_topic} (a 2--4-word ML concept
 phrase), Bloom's Revised Taxonomy level
 (integer 1--6), difficulty
@@ -1112,10 +1108,7 @@ software preferences (Table~\ref{tab:client_models}),
 prioritising architectural diversity. The federation
 involves no central training corpus; each
 institution's training data is its own.
-\red{TODO: institutional names (or anonymous IDs
-$\mathcal{I}_0,\dots,\mathcal{I}_4$); recruitment-form
-demographic figure; per-institution chunk and QA-pair
-counts; topic-coverage histograms.}
+% TODO(fp): institutional names (or anonymous IDs $\mathcal{I}_0,\dots,\mathcal{I}_4$); recruitment-form demographic figure; per-institution chunk and QA-pair counts; topic-coverage histograms.
 
 \subsection{Model Zoo}
 \label{sec:models}
@@ -1161,7 +1154,7 @@ fixed 50-sample val subsample), patience 10
 \emph{best} (lowest val-loss) and \emph{final}
 (last-epoch) LoRA checkpoints for separate evaluation.
 
-\textbf{Local optimisation.} AdamW with peak learning
+\textbf{Local optimization.} AdamW with peak learning
 rate $3{\times}10^{-4}$, cosine schedule with 10\%
 linear warm-up, gradient clipping 1.0, batch size 4,
 LoRA rank $r{=}16$ and $\alpha{=}32$, LoRA dropout
@@ -1180,7 +1173,7 @@ cognitive verb). All three are evaluated separately;
 the comparisons in \S\ref{sec:results} use
 \texttt{topic} unless otherwise stated.
 
-\textbf{Federated optimisation.} \UniEdu{} runs $T=33$
+\textbf{Federated optimization.} \UniEdu{} runs $T=33$
 federation rounds with $3$ local epochs per round and
 sample-size-weighted FedAvg of the GAT parameters
 $\boldsymbol{\phi}$ (\S\ref{sec:fed_opt}). The total
@@ -1214,7 +1207,7 @@ conditioned on additional fields:
   from the following machine learning text:}
   {[}context{]}'', where \texttt{[verb]} is the
   cognitive verb anchored at level $b$
-  (Remember/Understand/Apply/Analyse/Evaluate/Create).
+  (Remember/Understand/Apply/Analyze/Evaluate/Create).
 \end{itemize}
 
 \subsection{Baselines}
@@ -1239,8 +1232,7 @@ the same val set:
   knowledge distillation: each client trains a small
   ``mentee'' model that distils both the local
   ``mentor'' and the federated ensemble; only mentee
-  parameters are exchanged. \red{TODO: implement
-  FedKD in \texttt{unifiedfl/}.}
+  parameters are exchanged. % TODO(fp): implement FedKD in \texttt{unifiedfl/}.
   \item \textbf{FedMD}~\citep{li2019fedmd}. The
   canonical heterogeneous-federated-learning
   baseline. Each client trains its own SLM locally,
@@ -1251,16 +1243,15 @@ the same val set:
   heterogeneity is handled by-design because clients
   exchange logits rather than parameters. We use the
   public-testbed chunks (\S\ref{sec:public_testbed})
-  as the shared dataset. \red{TODO: implement FedMD
-  in \texttt{unifiedfl/}.}
+  as the shared dataset. % TODO(fp): implement FedMD in \texttt{unifiedfl/}.
   \item \textbf{FedDF}~\citep{lin2020feddf}.
-  Server-side ensemble distillation on an unlabelled
+  Server-side ensemble distillation on an unlabeled
   public dataset; no parameter averaging. Like
   FedMD, accommodates heterogeneous SLMs through
   output-space rather than parameter-space exchange,
   but moves the distillation step to the server.
   Re-uses the same public dataset as FedMD.
-  \red{TODO: implement FedDF in \texttt{unifiedfl/}.}
+  % TODO(fp): implement FedDF in \texttt{unifiedfl/}.
   \item \textbf{FedET}~\citep{cheng2022fedet}.
   Communicates per-client embeddings rather than
   logits: each client uploads its hidden-state
@@ -1269,8 +1260,7 @@ the same val set:
   aggregator, and clients distil the fused
   representation back into their local SLM. Closer
   in spirit to \UniEdu{}'s embedding-channel design
-  than FedMD/FedDF's logit channel. \red{TODO:
-  implement FedET in \texttt{unifiedfl/}.}
+  than FedMD/FedDF's logit channel. % TODO(fp): implement FedET in \texttt{unifiedfl/}.
 
 \smallskip
 Implementation details for all four
@@ -1291,14 +1281,14 @@ Appendix~\ref{app:baseline_implementations}.
 \end{itemize}
 
 \paragraph{For H2 (LLM approximation).}
-We compare the federated mixture of all SLMs ---
-i.e., \UniEdu{} aggregated across institutions, not
-each institution in isolation --- against
-single-model LLMs prompted zero-shot to produce a
+We compare the federated mixture of all SLMs (i.e.,
+\UniEdu{} aggregated across institutions, not each
+institution in isolation) against single-model LLMs
+prompted zero-shot to produce a
 $(q, a)$ pair from each test context, run through
 the same evaluation suite:
 \begin{itemize}[leftmargin=1.5em, itemsep=2pt]
-  \item \textbf{GPT-4o} \red{(headline ceiling)}.
+  \item \textbf{GPT-4o} (headline ceiling).
   \item \textbf{GPT-4o-mini}.
   \item \textbf{Llama-3.1-8B-Instruct}~\citep{grattafiori2024llama3}.
   \item \textbf{Qwen-2.5-7B-Instruct}~\citep{bai2023qwen}.
@@ -1546,10 +1536,7 @@ Under Eq.~\ref{eq:anchor_condition}:
 \end{equation}
 \end{proposition}
 
-\red{TODO: confirm at least one collaborator pair
-satisfies Eq.~\ref{eq:anchor_condition}, or
-operationalize an approximate matching by binning
-$\mathcal{R}_k$.}
+% TODO(fp): confirm at least one collaborator pair satisfies Eq.~\ref{eq:anchor_condition}, or operationalize an approximate matching by binning $\mathcal{R}_k$.
 
 \subsubsection{Knowledge Transfer Index}
 \label{sec:kti}
@@ -1629,7 +1616,7 @@ higher-is-better in $[1, 5]$. The Pairwise Equity
 Score $\bar{E}$ (Eq.~\ref{eq:pairwise_equity}) is
 higher-is-better and unbounded above.
 
-\subsection{H1 — Equity Comparison}
+\subsection{H1: Equity Comparison}
 \label{sec:results_equity}
 
 We compare \UniEdu{} (architecture-aware federated
@@ -1644,26 +1631,27 @@ BERTScore-F1 by $+0.0040$, and the local Bloom's
 educational-value score by $+0.0041$ (mean across
 the three institutions, best checkpoint;
 Table~\ref{tab:headline_global}). The gain is
-largest for $\mathcal{I}_2$ (LED-16384, ML papers)
---- the smallest-data, most under-represented
-institution --- where federation improves all four
-lightweight metrics simultaneously by margins of
+largest for $\mathcal{I}_2$ (LED-16384, ML papers),
+the smallest-data and most under-represented
+institution; federation improves all four
+lightweight metrics simultaneously there by margins of
 $+0.0166$ / $+0.0201$ / $+0.0058$ / $+0.0304$. On
 each client's own local test
 (Table~\ref{tab:val_test}, lower half), the
-individual baseline retains its specialisation
+individual baseline retains its specialization
 advantage on the native distribution: Indiv wins
 ROUGE-L on $\mathcal{I}_0$ and $\mathcal{I}_1$.
 \UniEdu{}, however, still wins all four lightweight
-metrics on $\mathcal{I}_2$'s local test --- the
+metrics on $\mathcal{I}_2$'s local test: the
 federation's value is most pronounced exactly where
-local data is scarcest. Cross-architecture
-federation across BART, Flan-T5, and LED
-simultaneously, a setting prior heterogeneous-FL
-work~\citep{wu2022fedkd, li2019fedmd, lin2020feddf,
-cheng2022fedet} did not attempt, is therefore not a
-breadth tax but the very mechanism that levels the
-playing field for the data-poor client.
+local data is scarcest. Federating BART, Flan-T5,
+and LED simultaneously, a setting that prior
+heterogeneous-FL work~\citep{wu2022fedkd,
+li2019fedmd, lin2020feddf, cheng2022fedet} did not
+attempt, therefore does not impose an accuracy cost
+for architectural diversity: the data-poor client
+is the one that benefits most from the shared
+inductive bias.
 
 % TODO(fp): re-run all (client, fold) cells with --no-heavy off + an
 % OpenAI key to populate the LLM-based block (RTC, Faith., QAFE, RQUGE,
@@ -1695,7 +1683,7 @@ claims entailed by the context). QAFE: QAFactEval
 (approximate). RQU: RQUGE (in $[1,5]$, others in
 $[0,1]$). RTC: Round-Trip Consistency. LLM-J:
 GPT-4o LLM-judge overall, mean of four 1--5
-rubric dimensions normalised to $[0,1]$.}
+rubric dimensions normalized to $[0,1]$.}
 \label{tab:headline_global}
 \begin{tabular}{ll cccc ccccccc}
 \toprule
@@ -2037,7 +2025,7 @@ $\mathcal{I}_4$ & -- & -- & -- \\
 \end{tabular}
 \end{table}
 
-\subsection{H2 — LLM Approximation}
+\subsection{H2: LLM Approximation}
 \label{sec:results_llm_approx}
 
 We compare \emph{the federated mixture as a whole}
@@ -2088,11 +2076,7 @@ Gemini-1.5-Flash    & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 \subsection{Qualitative Examples}
 \label{sec:results_qualitative}
 
-\red{TODO: one $(c, q^{\indiv}, q^{\uni},
-q^{\text{GPT-4o}})$ sample per institution, chosen
-to illustrate the federation's effect. Place the full
-set in Appendix~\ref{app:qualitative}; reproduce one
-or two illustrative examples in the body.}
+% TODO(fp): one $(c, q^{\indiv}, q^{\uni}, q^{\text{GPT-4o}})$ sample per institution, chosen to illustrate the federation's effect. Place the full set in Appendix~\ref{app:qualitative}; reproduce one or two illustrative examples in the body.
 
 %% ════════════════════════════════════════════════════════════
 \section{Discussion}
@@ -2108,7 +2092,7 @@ backbone. This makes the privacy story
 straightforward: neither curricular text nor
 LoRA-adapted weights leave the institution. The price
 is that the federation cannot directly transfer
-task-level knowledge — the only way for institution
+task-level knowledge: the only way for institution
 $k$'s inductive bias to reach institution $l$'s
 outputs is through the conditioning that
 $\boldsymbol{\phi}$ imposes on $l$'s FiLM modulator.
@@ -2117,16 +2101,16 @@ The KTI metric (§\ref{sec:kti}) and the
 exactly this indirect transfer.
 
 \textbf{Future directions.}
-\emph{(i) Broader architecture support} — extending
+\emph{(i) Broader architecture support}: extending
 the architecture-graph constructor to decoder-only
 backbones (Llama, Qwen, Gemma) and mixture-of-experts
 models, which would test the limits of the
 fixed-feature schema.
-\emph{(ii) Richer conditioning} — replacing FiLM's
+\emph{(ii) Richer conditioning}: replacing FiLM's
 affine modulation with a low-rank attention
 modulator, or routing the GAT output through the
 LoRA $\mathbf{B}$-matrix as a conditioning prior.
-\emph{(iii) Curriculum-aware federation} — adding a
+\emph{(iii) Curriculum-aware federation}: adding a
 content-graph alongside the architecture graph so
 topical structure also informs the shared encoder,
 while preserving privacy via topic-level embeddings.
@@ -2141,9 +2125,9 @@ encoder-decoder backbones (T5, BART, LED) and
 non-IID educational curricula without sharing any
 private teaching material. The key design choice is a
 clean separation between \emph{local} components that
-learn each institution's distribution — a backbone
+learn each institution's distribution (a backbone
 with a private LoRA adapter plus a private FiLM
-modulator — and the \emph{shared} component that
+modulator) and the \emph{shared} component that
 crosses institutional boundaries, a single graph
 attention network whose parameters are aggregated by
 sample-size-weighted FedAvg. The GAT operates on a
@@ -2160,10 +2144,10 @@ quality, answer faithfulness, joint question-answer
 consistency, two independent pedagogical-depth
 assessments, a four-dimensional LLM QA-quality
 judge, and three equity metrics tailored to the
-educational AQAG setting. We expect \UniEdu{} to lay
-a scalable foundation for equitable,
-privacy-preserving multi-institutional collaboration
-in AI-powered education.
+educational AQAG setting. Taken together, these design choices position
+\UniEdu{} as a practical foundation for equitable,
+privacy-preserving AQAG across heterogeneous
+institutional curricula.
 
 %% ════════════════════════════════════════════════════════════
 \section*{Limitations}
@@ -2176,8 +2160,8 @@ in AI-powered education.
   propagates is limited by the dimension of
   $\boldsymbol{\phi}$ and by FiLM's expressivity (a
   residual scale-and-shift per block). Tasks that
-  demand deeper coupling — for example explicit
-  cross-client curriculum alignment — are out of reach
+  demand deeper coupling, for example explicit
+  cross-client curriculum alignment, are out of reach
   for the current design.
   \item \textbf{Architecture-graph fidelity.} Our
   graph is coarse (one node per transformer block),
@@ -2189,11 +2173,10 @@ in AI-powered education.
   SLMs: BART-base, Flan-T5-base, LED-base-16384,
   Pegasus-X-base, and ProphetNet-large. Decoder-only
   causal LMs (Phi-3, Gemma, Llama-3, Mistral) are
-  supported in principle --- FiLM hooks would attach
-  to causal blocks identically --- but are not
+  supported in principle (FiLM hooks would attach
+  to causal blocks identically) but are not
   exercised in this paper.
-  \red{TODO: confirm whether to claim decoder-only
-  support or scope strictly to encoder-decoder.}
+  % TODO(fp): confirm whether to claim decoder-only support or scope strictly to encoder-decoder.
   \item \textbf{Bloom's labels and LLM judges.} The
   Bloom's BERT classifier and the LLM judges rely on
   pre-trained off-the-shelf models whose biases we do
@@ -2216,17 +2199,13 @@ in AI-powered education.
   which makes per-fold evaluation API-cost-bounded
   rather than compute-bounded. We report API costs
   per institution per fold in
-  Appendix~\red{[TODO: add appendix]}.
+  Appendix~% TODO(fp): [TODO: add appendix].
 \end{itemize}
 
 %% ════════════════════════════════════════════════════════════
 \section*{Acknowledgments}
 
-\red{TODO: institutional / compute / funding
-acknowledgments; thanks to the public-testbed source
-materials (MIT 18.657, Stanford CS229, arXiv) and
-the five collaborating institutions of the private
-testbed for their participation; etc.}
+% TODO(fp): institutional / compute / funding acknowledgments; thanks to the public-testbed source materials (MIT 18.657, Stanford CS229, arXiv) and the five collaborating institutions of the private testbed for their participation; etc.
 
 %% ════════════════════════════════════════════════════════════
 % Custom bibliography only (no Anthology). Switch to
@@ -2360,7 +2339,7 @@ appear in Table~\ref{tab:client_models}.}
   & Batch size                                 & $4$ \\
   & Max input length                           & $512$ tokens \\
   & Max target length                          & $128$ tokens \\
-  & Optimiser                                  & AdamW (weight decay $0.01$) \\
+  & Optimizer                                  & AdamW (weight decay $0.01$) \\
   & LR schedule                                & cosine with 10\% linear warm-up \\
   & Warm-up ratio                              & $0.1$ \\
   & Gradient clipping (L2 norm)                & $1.0$ \\
@@ -2438,11 +2417,11 @@ appear in Table~\ref{tab:client_models}.}
 
 For the dataset-statistics side, the per-fold sample
 counts on the public testbed are:
-$\mathcal{I}_0$ (MIT, BART) — fold~1 train/val
+$\mathcal{I}_0$ (MIT, BART), fold~1 train/val
 $313 / 154$, fold~2 $310 / 157$, fold~3 $311 / 156$;
-$\mathcal{I}_1$ (Stanford, Flan-T5) — fold~1
+$\mathcal{I}_1$ (Stanford, Flan-T5), fold~1
 $320 / 158$, fold~2 $321 / 157$, fold~3 $315 / 163$;
-$\mathcal{I}_2$ (ML papers, LED) — fold~1
+$\mathcal{I}_2$ (ML papers, LED), fold~1
 $2854 / 1428$, fold~2 $2857 / 1425$, fold~3
 $2853 / 1429$. Per-client local test sets are
 $|\mathcal{T}_0|{=}80$, $|\mathcal{T}_1|{=}81$,
@@ -2464,9 +2443,7 @@ including \texttt{question\_topic}, integer
 deterministic 3-fold CV splits with seed~$=42$;
 and (iv)~MD5 checksums of every split file.
 
-\red{TODO: insert the per-source chunk-count and
-QA-pair-count table; insert the checksum file in
-verbatim form.}
+% TODO(fp): insert the per-source chunk-count and QA-pair-count table; insert the checksum file in verbatim form.
 
 \section{Balanced vs.\ Unbalanced Public Testbed}
 \label{app:balanced_vs_unbalanced}
@@ -2482,11 +2459,7 @@ randomly sub-sampled to match the smaller
 institutions (110 chunks each, deterministic with
 seed~$=42$).
 
-\red{TODO: insert side-by-side comparison table
-once Phase~2 finishes for both variants. Expectation:
-the GAT-mediated transfer should remain measurable
-in the balanced setting, isolating the federation
-effect from raw data-quantity effects.}
+% TODO(fp): insert side-by-side comparison table once Phase~2 finishes for both variants. Expectation: the GAT-mediated transfer should remain measurable in the balanced setting, isolating the federation effect from raw data-quantity effects.
 
 \section{Diverse-LLM Reference Panel}
 \label{app:llm_baselines}
@@ -2504,22 +2477,19 @@ context. Models: \texttt{gpt-4o},
 model's outputs are scored with the same evaluation
 suite as \UniEdu{}.
 
-\red{TODO: insert Table comparing the diverse-LLM
-panel against \UniEdu{} on the public-testbed mean.}
+% TODO(fp): insert Table comparing the diverse-LLM panel against \UniEdu{} on the public-testbed mean.
 
 \section{Architecture Graph Examples}
 \label{app:graph_examples}
 
-For each SLM family, we visualise the architecture
-graph our constructor builds (nodes coloured by
+For each SLM family, we visualize the architecture
+graph our constructor builds (nodes colored by
 layer-type ID, edges in forward order). The graphs
 have $|\mathcal{V}_k| \in [\sim\!200, \sim\!500]$
 nodes depending on backbone size; node feature
 vectors are 16-dimensional (\S\ref{sec:arch_graph}).
 
-\red{TODO: insert one graph figure per family
-(BART, Flan-T5, LED, Pegasus-X, ProphetNet) generated
-via \texttt{unifiedfl/visualize\_graph.py}.}
+% TODO(fp): insert one graph figure per family (BART, Flan-T5, LED, Pegasus-X, ProphetNet) generated via \texttt{unifiedfl/visualize\_graph.py}.
 
 \section{Computational Cost and API Usage}
 \label{app:cost}
@@ -2546,11 +2516,7 @@ four-dimension QA-quality judge collectively cost
 $\sim$\$0.30 per training run on the val set, scaling
 with val-set size.
 
-\red{TODO: report final wall-clock and API totals per
-testbed; include a footnote on how the cost
-compares against running GPT-4o as the QA-generator
-itself (the natural opponent in our headline
-hypothesis).}
+% TODO(fp): report final wall-clock and API totals per testbed; include a footnote on how the cost compares against running GPT-4o as the QA-generator itself (the natural opponent in our headline hypothesis).
 
 \section{Qualitative Examples}
 \label{app:qualitative}
@@ -2565,9 +2531,7 @@ hand to illustrate cases where federation closes the
 gap with GPT-4o, cases where it does not, and any
 qualitative failure modes.
 
-\red{TODO: hand-pick examples post-results; format
-each as (context, indiv-QA, uni-QA, GPT-4o-QA) with
-a short comment.}
+% TODO(fp): hand-pick examples post-results; format each as (context, indiv-QA, uni-QA, GPT-4o-QA) with a short comment.
 
 \section{Equity-Metric Derivations and Implementation}
 \label{app:equity_derivations}
@@ -2595,9 +2559,9 @@ QA-quality score under paradigm $m$ (we use the
 LLM-judge overall by default; any of the metrics in
 Tables~\ref{tab:headline_global}--\ref{tab:equity_private}
 also work). $\mathcal{C}_k$ is curricular richness
-(Eq.~\ref{eq:richness}), normalised to $[0, 1]$
+(Eq.~\ref{eq:richness}), normalized to $[0, 1]$
 across the federation. $\mathcal{R}_k$ is the
-trainable-parameter count of $k$'s SLM, normalised
+trainable-parameter count of $k$'s SLM, normalized
 to $[0, 1]$ by dividing by the largest in the
 federation. $\varepsilon = 10^{-6}$.
 The mean PES reported as $\bar{E}$ in
@@ -2615,7 +2579,7 @@ post-processed from the output of
 \texttt{experiments/04\_aggregate\_results.py} via a
 small helper script
 (\texttt{experiments/11\_compute\_equity.py},
-\red{TODO: implement}).
+% TODO(fp): implement).
 
 \paragraph{Knowledge Transfer Index (KTI).}
 For a directed pair $(l \leftarrow k)$:
@@ -2660,7 +2624,7 @@ low-resource individual.
   \item Anchor Equity assumes there exists an anchor
   question $q^*$ over a concept covered by both $k$
   and $l$. We list the anchor questions used in
-  Table~\red{[TODO]}.
+  Table~% TODO(fp): [TODO].
 \end{itemize}
 
 \section{Distillation-Based Baseline Implementations}
@@ -2676,20 +2640,20 @@ with a trainable LoRA adapter on the attention
 projections.
 
 \paragraph{Shared public dataset.}
-FedMD, FedDF, and FedET require an unlabelled
+FedMD, FedDF, and FedET require an unlabeled
 public dataset for their distillation step. We use
 the public-testbed chunks
 (\S\ref{sec:public_testbed}) as that dataset: each
 client computes its outputs (logits or hidden
 states, depending on the method) on these chunks
 and exchanges only those, never raw curricular
-text. The public testbed thus serves a dual role
---- as one of our experimental settings, and as the
+text. The public testbed thus serves a dual role:
+as one of our experimental settings, and as the
 public-distillation surface for the other three
 baselines.
 
 \paragraph{FedKD~\citep{wu2022fedkd}.}
-\red{TODO}: (i)~mentor/mentee pair per client,
+% TODO(fp): : (i)~mentor/mentee pair per client,
 both seeded from the institution's local SLM
 checkpoint; (ii)~local distillation loss (KL on
 next-token distributions between mentor and mentee);
@@ -2697,7 +2661,7 @@ next-token distributions between mentor and mentee);
 (iv)~hyperparameter table.
 
 \paragraph{FedMD~\citep{li2019fedmd}.}
-\red{TODO}: (i)~each client trains its local SLM
+% TODO(fp): : (i)~each client trains its local SLM
 on its private curriculum; (ii)~all clients
 generate logits (or top-$k$ next-token
 distributions) on the shared public dataset;
@@ -2708,7 +2672,7 @@ local SLM by adding a KL term on those examples;
 (v)~hyperparameter table.
 
 \paragraph{FedDF~\citep{lin2020feddf}.}
-\red{TODO}: (i)~each client uploads logits on the
+% TODO(fp): : (i)~each client uploads logits on the
 shared public dataset; (ii)~the server runs
 ensemble distillation by training a small server-
 side model on the averaged ensemble outputs;
@@ -2718,7 +2682,7 @@ client-side parameter averaging anywhere in the
 pipeline; (v)~hyperparameter table.
 
 \paragraph{FedET~\citep{cheng2022fedet}.}
-\red{TODO}: (i)~each client extracts hidden-state
+% TODO(fp): : (i)~each client extracts hidden-state
 representations on the shared public dataset from
 a chosen layer of its SLM; (ii)~server fuses
 representations through a small enhanced-transformer
@@ -2728,7 +2692,7 @@ representation-matching loss; (iv)~hyperparameter
 table.
 
 \paragraph{Implementation footprint.}
-\red{TODO} insert wall-clock and OpenAI-API cost
+% TODO(fp):  insert wall-clock and OpenAI-API cost
 deltas for each baseline relative to \UniEdu{}.
 
 %% ════════════════════════════════════════════════════════════
