@@ -1632,7 +1632,7 @@ higher-is-better and unbounded above.
 \label{sec:results_equity}
 
 We compare \UniEdu{} (architecture-aware federated
-LoRA + FiLM, \S\ref{sec:framework}) against the
+LoRA + FiLM, \S\ref{sec:method}) against the
 per-institution local baseline \textbf{Indiv} on the
 public testbed (Table~\ref{tab:headline_global},
 Table~\ref{tab:val_test}). Federation lifts every
@@ -1679,7 +1679,7 @@ cross-distribution \textbf{global test set}
 pooled across institutions; best checkpoint, mean
 over 3 folds). Lightweight reference-based metrics
 on the left; reference-free LLM-based metrics on
-the right (\S\ref{sec:eval}). Bold = better of
+the right (\S\ref{sec:evaluation}). Bold = better of
 $\{\indiv, \uni\}$ per (institution, metric).
 \textbf{Column abbreviations.} R-L: ROUGE-L F1.
 B-4: BLEU-4. BERT: BERTScore-F1.
@@ -2309,38 +2309,143 @@ exact string sent to the API after
 \section{Hyperparameter Tables}
 \label{app:hyperparams}
 
-\red{TODO: full hyperparameter table per backbone /
-per fold once Phase~2 results are finalised.}
-Defaults shared across all SLMs:
+% TODO(fp): two caveats from the launch-time verification audit
+% (2026-05-08) that the table presents as if uniform across runs:
+%   (a) client_2/fold_1/best/metrics_val.json has the full
+%       comprehensive eval suite (947 KB, includes faithfulness,
+%       qafacteval, rquge, answer_relevancy, llm_judge_*) — that
+%       cell was either launched without --no-heavy or re-evaluated
+%       comprehensively post hoc. The lightweight numbers used in
+%       Tables 1/2 remain valid and apples-to-apples with the other
+%       cells; only the "every cell ran with --fast-eval" claim is
+%       technically false for that file.
+%   (b) The deterministic-CUDA reproducibility setup (commit e079ace,
+%       2026-05-06 16:11 BST) was active for all DoC-launched runs
+%       (fed fold2/3, indiv c2/f3); for the earlier Colab-launched
+%       runs the launch commit is not on-machine-recoverable, so
+%       deterministic mode is unconfirmed for those. Practical
+%       output deltas are negligible but the literal "fully
+%       deterministic, seed=42" framing applies cleanly only to the
+%       DoC-launched cells.
 
-\begin{itemize}[leftmargin=1.5em, itemsep=2pt]
-  \item \textbf{Optimiser.} AdamW, peak LR
-  $3{\times}10^{-4}$, weight decay $0.01$, cosine
-  schedule with 10\% linear warm-up, gradient
-  clipping $1.0$, batch size $4$.
-  \item \textbf{Sequence lengths.}
-  $\texttt{max\_input\_len}{=}512$,
-  $\texttt{max\_target\_len}{=}128$.
-  \item \textbf{LoRA.} Rank $r{=}16$, scaling
-  $\alpha{=}32$, dropout $0.1$. Targets follow
-  Table~\ref{tab:client_models}.
-  \item \textbf{FiLM adapter.} Hidden 128, ReLU,
-  output dimension $2 d_{\text{model}}^{(k)}$,
-  $\alpha_{\text{init}}{=}0$ (identity at init).
-  \item \textbf{GAT.} 3 layers, hidden 64, 4 attention
-  heads in layers 1--2 (concat), 1 head in layer 3,
-  ELU + dropout $0.1$. Input feature dimension 16.
-  \item \textbf{Individual training.} Up to 100
-  epochs, early stopping with patience $10$ and
-  $\Delta_{\min}{=}10^{-4}$ on greedy-decoded
-  ROUGE-L over a fixed 50-sample val subsample.
-  Periodic checkpoints every 5 epochs.
-  \item \textbf{Federated training.} $T{=}33$
-  rounds, $3$ local epochs per round,
-  sample-size-weighted FedAvg of GAT parameters,
-  best-snapshot restoration at the round with the
-  lowest average val loss across clients.
-\end{itemize}
+Table~\ref{tab:hyperparams_full} reports every
+hyperparameter used across the public-testbed runs.
+Numeric values are taken verbatim from the slurm
+launch logs (DoC-launched runs) or the script
+defaults at the launch commit; LoRA settings were
+spot-checked against the saved
+\texttt{adapter\_config.json} files. Per-client
+backbone specifications are in
+Table~\ref{tab:client_models}; everything else
+below is identical across the three institutions.
+
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{6pt}
+\caption{Public-testbed hyperparameters. Identical
+across the three clients unless noted. Per-client
+backbone, LoRA-target naming, and $d_{\text{model}}$
+appear in Table~\ref{tab:client_models}.}
+\label{tab:hyperparams_full}
+\begin{tabular}{lll}
+\toprule
+\textbf{Block} & \textbf{Hyperparameter} & \textbf{Value} \\
+\midrule
+
+\multirow{8}{*}{\textbf{Shared}}
+  & Random seed                                & $42$ \\
+  & Batch size                                 & $4$ \\
+  & Max input length                           & $512$ tokens \\
+  & Max target length                          & $128$ tokens \\
+  & Optimiser                                  & AdamW (weight decay $0.01$) \\
+  & LR schedule                                & cosine with 10\% linear warm-up \\
+  & Warm-up ratio                              & $0.1$ \\
+  & Gradient clipping (L2 norm)                & $1.0$ \\
+\midrule
+
+\multirow{4}{*}{\textbf{LoRA (all clients)}}
+  & Rank $r$                                   & $16$ \\
+  & Scaling $\alpha$                           & $32$ \\
+  & Dropout                                    & $0.1$ \\
+  & Bias                                       & none \\
+\midrule
+
+\multirow{6}{*}{\textbf{Individual training}}
+  & Max epochs                                 & $100$ \\
+  & Learning rate (LoRA)                       & $3 \times 10^{-4}$ \\
+  & Early-stop patience                        & $10$ epochs \\
+  & Early-stop $\Delta_{\min}$                 & $10^{-4}$ \\
+  & Early-stop metric                          & greedy ROUGE-L on $50$ fixed val samples \\
+  & Periodic checkpoint                        & every $5$ epochs \\
+\midrule
+
+\multirow{6}{*}{\textbf{Eval (Indiv, baseline)}}
+  & Decoding                                   & diverse beam search \\
+  & Beams                                      & $10$ \\
+  & Beam groups                                & $5$ \\
+  & Diversity penalty                          & $1.0$ \\
+  & Returned sequences / context               & $5$ (Hungarian-matched to refs) \\
+  & Eval suite                                 & lightweight (\texttt{--fast-eval}) \\
+\midrule
+
+\multirow{8}{*}{\textbf{Federated (\UniEdu{})}}
+  & Rounds $T$                                 & $33$ \\
+  & Local epochs / round                       & $3$ \\
+  & Learning rate (LoRA)                       & $3 \times 10^{-4}$ \\
+  & Learning rate (GAT)                        & $1 \times 10^{-3}$ \\
+  & Learning rate (FiLM)                       & $1 \times 10^{-3}$ \\
+  & Best-snapshot metric                       & avg greedy ROUGE-L on $50$ fixed val samples / client (post-aggregation) \\
+  & Periodic checkpoint                        & every $5$ rounds \\
+  & FedAvg scope                               & sample-size-weighted; GAT params only (LoRA + FiLM stay client-local) \\
+\midrule
+
+\multirow{6}{*}{\textbf{GAT (\UniEdu{})}}
+  & Layers                                     & $3$ \\
+  & Hidden                                     & $64$ \\
+  & Heads (layers 1--2, concat)                & $4$ \\
+  & Heads (layer 3, no concat)                 & $1$ \\
+  & Input feature dimension                    & $16$ \\
+  & Activation / dropout                       & ELU / $0.1$ \\
+\midrule
+
+\multirow{3}{*}{\textbf{FiLM (\UniEdu{})}}
+  & Hidden                                     & $128$ \\
+  & Output dimension                           & $2 \, d_{\text{model}}^{(k)}$ per client \\
+  & $\alpha_{\text{init}}$                     & $0$ (identity at init) \\
+\midrule
+
+\multirow{4}{*}{\textbf{Mixed precision}}
+  & Base-model dtype                           & FP32 (frozen) \\
+  & LoRA adapter dtype                         & FP32 \\
+  & Autocast                                   & BF16 on CUDA when supported; FP32 otherwise \\
+  & GradScaler                                 & disabled (BF16 has FP32-range exponent) \\
+\midrule
+
+\multirow{5}{*}{\textbf{Reproducibility}}
+  & \texttt{torch.manual\_seed} / \texttt{numpy.random.seed} / \texttt{random.seed} & $42$ \\
+  & cuDNN deterministic                        & \texttt{True} \\
+  & cuDNN benchmark                            & \texttt{False} \\
+  & \texttt{torch.use\_deterministic\_algorithms} & \texttt{True} (\texttt{warn\_only=True}) \\
+  & \texttt{CUBLAS\_WORKSPACE\_CONFIG}, \texttt{PYTHONHASHSEED} & \texttt{:4096:8}, \texttt{42} \\
+
+\bottomrule
+\end{tabular}
+\end{table*}
+
+For the dataset-statistics side, the per-fold sample
+counts on the public testbed are:
+$\mathcal{I}_0$ (MIT, BART) — fold~1 train/val
+$313 / 154$, fold~2 $310 / 157$, fold~3 $311 / 156$;
+$\mathcal{I}_1$ (Stanford, Flan-T5) — fold~1
+$320 / 158$, fold~2 $321 / 157$, fold~3 $315 / 163$;
+$\mathcal{I}_2$ (ML papers, LED) — fold~1
+$2854 / 1428$, fold~2 $2857 / 1425$, fold~3
+$2853 / 1429$. Per-client local test sets are
+$|\mathcal{T}_0|{=}80$, $|\mathcal{T}_1|{=}81$,
+$|\mathcal{T}_2|{=}755$; the global test pool
+$\mathcal{T}^{\text{global}}$ is their concatenation
+($916$ samples).
 
 \section{Public Testbed Reproducibility}
 \label{app:reproducibility}
