@@ -1845,7 +1845,7 @@ Table~\ref{tab:headline_global}.}
 \end{tabular}
 \end{table*}
 
-\red{TODO: Bloom-BERT EVS values for \UniEdu{} can be filled from the blooms_cls_evs_mean key already present in metrics_*.json (best ckpt, global test). Bloom-LLM EVS and LLM-judge columns require a re-run with the OpenAI key enabled.}
+\red{TODO: Bloom-BERT EVS values for \UniEdu{} can be filled from the blooms\_cls\_evs\_mean key already present in metrics\_*.json (best ckpt, global test). Bloom-LLM EVS and LLM-judge columns require a re-run with the OpenAI key enabled.}
 \begin{table*}[t]
 \centering
 \small
@@ -1893,7 +1893,7 @@ Method rows: \textbf{Indiv} (\S\ref{sec:baselines}),
 \end{tabular}
 \end{table*}
 
-\red{TODO: four-dim LLM-judge breakdown not yet populated; needs the same OpenAI-enabled re-run flagged for tab:headline_global.}
+\red{TODO: four-dim LLM-judge breakdown not yet populated; needs the same OpenAI-enabled re-run flagged for tab:headline\_global.}
 \begin{table}[t]
 \centering
 \footnotesize
@@ -1961,7 +1961,7 @@ $\mathcal{I}_4$ (ProphetNet)  & -- & -- & -- & -- \\
 \end{tabular}
 \end{table}
 
-\red{TODO: KTI requires per-direction held-out eval on T_{k\setminus l} chunks; eval pool not yet curated.}
+\red{TODO: KTI requires per-direction held-out eval on T\_{k\setminus l} chunks; eval pool not yet curated.}
 \begin{table}[t]
 \centering
 \small
@@ -2282,7 +2282,7 @@ exact string sent to the API after
 \section{Hyperparameter Tables}
 \label{app:hyperparams}
 
-\red{TODO: two caveats from the launch-time verification audit (2026-05-08) that the table presents as if uniform across runs:   (a) client_2/fold_1/best/metrics_val.json has the full       comprehensive eval suite (947 KB, includes faithfulness,       qafacteval, rquge, answer_relevancy, llm_judge_*) — that       cell was either launched without --no-heavy or re-evaluated       comprehensively post hoc. The lightweight numbers used in       Tables 1/2 remain valid and apples-to-apples with the other       cells; only the "every cell ran with --fast-eval" claim is       technically false for that file.   (b) The deterministic-CUDA reproducibility setup (commit e079ace,       2026-05-06 16:11 BST) was active for all DoC-launched runs       (fed fold2/3, indiv c2/f3); for the earlier Colab-launched       runs the launch commit is not on-machine-recoverable, so       deterministic mode is unconfirmed for those. Practical       output deltas are negligible but the literal "fully       deterministic, seed=42" framing applies cleanly only to the       DoC-launched cells.}
+\red{TODO: two caveats from the launch-time verification audit (2026-05-08) that the table presents as if uniform across runs:   (a) client\_2/fold\_1/best/metrics\_val.json has the full       comprehensive eval suite (947 KB, includes faithfulness,       qafacteval, rquge, answer\_relevancy, llm\_judge\_*) — that       cell was either launched without --no-heavy or re-evaluated       comprehensively post hoc. The lightweight numbers used in       Tables 1/2 remain valid and apples-to-apples with the other       cells; only the "every cell ran with --fast-eval" claim is       technically false for that file.   (b) The deterministic-CUDA reproducibility setup (commit e079ace,       2026-05-06 16:11 BST) was active for all DoC-launched runs       (fed fold2/3, indiv c2/f3); for the earlier Colab-launched       runs the launch commit is not on-machine-recoverable, so       deterministic mode is unconfirmed for those. Practical       output deltas are negligible but the literal "fully       deterministic, seed=42" framing applies cleanly only to the       DoC-launched cells.}
 
 Table~\ref{tab:hyperparams_full} reports every
 hyperparameter used across the public-testbed runs.
