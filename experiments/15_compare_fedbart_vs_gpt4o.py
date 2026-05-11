@@ -145,8 +145,31 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--client", action="append", default=None,
                    metavar="ID:MODEL:FAMILY:TARGETS:D_MODEL")
     p.add_argument("--client-id-bart", type=int, default=0,
-                   help="Which client is BART (default 0). Other clients are still built so FiLM hooks can match training topology.")
+                   help="Which federated client to use as the SLM under "
+                        "test (0=BART, 1=Flan-T5, 2=LED). Name kept "
+                        "'bart' for backward compat; the other 2 clients "
+                        "are still built so FiLM hooks match training topology.")
+    p.add_argument("--model-label", default=None,
+                   help="Pretty label for this client in summary tables. "
+                        "Default: 'fed-BART' / 'fed-T5' / 'fed-LED' for "
+                        "client_id 0 / 1 / 2.")
+    p.add_argument("--generation-stem", default=None,
+                   help="Filename stem for per-fold generation files. "
+                        "Default: 'fedbart' / 'fedt5' / 'fedled' for "
+                        "client_id 0 / 1 / 2.")
+    p.add_argument("--gpt4o-cache-path", default=None,
+                   help="Optional explicit path to a cached GPT-4o "
+                        "generations JSON (same 916 rows, same prompt). "
+                        "If set and n_rows matches, GPT-4o stage is "
+                        "skipped and predictions are loaded from this "
+                        "file. Default behavior unchanged.")
     return p.parse_args()
+
+
+# Defaults derived from client-id when --model-label / --generation-stem unset.
+_LABEL_DEFAULTS = {0: ("fed-BART", "fedbart"),
+                   1: ("fed-T5",   "fedt5"),
+                   2: ("fed-LED",  "fedled")}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -444,8 +467,8 @@ def aggregate_summary(
     return out
 
 
-def format_summary_text(summary: Dict[str, dict]) -> str:
-    """Pretty per-slice comparison: fed-BART (mean±std across folds) vs GPT-4o."""
+def format_summary_text(summary: Dict[str, dict], model_label: str = "fed-BART") -> str:
+    """Pretty per-slice comparison: <model_label> (mean±std across folds) vs GPT-4o."""
     lines: List[str] = []
     metric_order = ("rouge_l", "bleu_4", "bertscore_f1", "blooms_cls_evs_mean")
     metric_labels = ("ROUGE-L", "BLEU-4", "BERTScore-F1", "Bloom-EVS")
@@ -472,7 +495,7 @@ def format_summary_text(summary: Dict[str, dict]) -> str:
         return f"{v:.4f}      "
 
     lines.append("=" * 96)
-    lines.append("  Federated-BART (mean±std over folds) vs GPT-4o   |  global mixed test")
+    lines.append(f"  Federated {model_label} (mean±std over folds) vs GPT-4o   |  global mixed test")
     lines.append("=" * 96)
     header = f"  {'slice':10s}  {'model':22s}  " + "  ".join(f"{m:>14s}" for m in metric_labels) + "    n"
     lines.append(header)
@@ -492,12 +515,12 @@ def format_summary_text(summary: Dict[str, dict]) -> str:
 
         if has_bart:
             cells = "  ".join(f"{fmt_bart(slice_key, mk):>14s}" for mk in metric_order)
-            lines.append(f"  {slice_label:10s}  {'fed-BART':22s}  {cells}    {n}")
+            lines.append(f"  {slice_label:10s}  {model_label:22s}  {cells}    {n}")
         if has_gpt:
             cells = "  ".join(f"{fmt_gpt(slice_key, mk):>14s}" for mk in metric_order)
             lines.append(f"  {slice_label:10s}  {'GPT-4o':22s}  {cells}    {n}")
         if has_bart and has_gpt and slice_key in summary["fedbart_avg"] and slice_key in summary["gpt4o"]:
-            # Delta line (GPT-4o − fed-BART mean)
+            # Delta line (GPT-4o − fed-SLM mean)
             delta_cells = []
             for mk in metric_order:
                 mu = summary["fedbart_avg"][slice_key].get(f"{mk}_mean")
@@ -523,8 +546,19 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Derive label + filename stem from --client-id-bart unless explicitly set.
+    default_label, default_stem = _LABEL_DEFAULTS.get(
+        args.client_id_bart, (f"fed-client{args.client_id_bart}",
+                              f"fedclient{args.client_id_bart}"))
+    if args.model_label is None:
+        args.model_label = default_label
+    if args.generation_stem is None:
+        args.generation_stem = default_stem
+
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
+    print(f"SLM under test: client_{args.client_id_bart} → label={args.model_label!r}  "
+          f"file-stem={args.generation_stem!r}")
 
     # ── 1. Load + sample ───────────────────────────────────────────────────
     global_test = json.loads(Path(args.global_test_file).read_text(encoding="utf-8"))
@@ -545,11 +579,11 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    # ── 2. Fed-BART per fold ───────────────────────────────────────────────
+    # ── 2. Fed-SLM per fold ───────────────────────────────────────────────
     fedbart_preds_by_fold: Dict[int, List[str]] = {}
     if not args.skip_bart:
         for fold in args.folds:
-            out_path = out_dir / f"generations_fedbart_fold{fold}.json"
+            out_path = out_dir / f"generations_{args.generation_stem}_fold{fold}.json"
             if out_path.exists() and not args.force_regen:
                 cached = json.loads(out_path.read_text(encoding="utf-8"))
                 if cached.get("n_rows") == len(samples):
@@ -561,6 +595,8 @@ def main() -> None:
             fedbart_preds_by_fold[fold] = preds
             out_path.write_text(
                 json.dumps({"fold": fold, "n_rows": len(samples),
+                            "model_label": args.model_label,
+                            "client_id": args.client_id_bart,
                             "predictions": preds}, indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )
@@ -569,8 +605,17 @@ def main() -> None:
     # ── 3. GPT-4o ──────────────────────────────────────────────────────────
     gpt4o_preds: List[str] | None = None
     if not args.skip_gpt4o:
+        # Check optional external cache first (lets multiple architecture
+        # runs share a single 916-row GPT-4o pass).
+        external_cache = args.gpt4o_cache_path and Path(args.gpt4o_cache_path)
+        if external_cache and external_cache.exists() and not args.force_regen:
+            cached = json.loads(external_cache.read_text(encoding="utf-8"))
+            if cached.get("n_rows") == len(samples):
+                print(f"  [gpt-4o] external cache → {external_cache}")
+                gpt4o_preds = cached["predictions"]
+
         out_path = out_dir / "generations_gpt4o.json"
-        if out_path.exists() and not args.force_regen:
+        if gpt4o_preds is None and out_path.exists() and not args.force_regen:
             cached = json.loads(out_path.read_text(encoding="utf-8"))
             if cached.get("n_rows") == len(samples):
                 print(f"  [gpt-4o] cached → reusing {out_path.name}")
@@ -605,10 +650,16 @@ def main() -> None:
     print("\nComputing metrics …")
     summary = aggregate_summary(samples, fedbart_preds_by_fold, gpt4o_preds,
                                 device, args.blooms_model)
+    summary["_meta"] = {
+        "model_label": args.model_label,
+        "client_id":   args.client_id_bart,
+        "n_rows":      len(samples),
+        "folds":       list(fedbart_preds_by_fold.keys()),
+    }
     (out_dir / "metrics_per_run.json").write_text(
         json.dumps(summary, indent=2), encoding="utf-8",
     )
-    txt = format_summary_text(summary)
+    txt = format_summary_text(summary, model_label=args.model_label)
     print("\n" + txt)
     (out_dir / "comparison_summary.txt").write_text(txt, encoding="utf-8")
     print(f"\nAll outputs in {out_dir}/")

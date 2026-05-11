@@ -26,14 +26,28 @@
 set -euo pipefail
 
 REPO=/vol/bitbucket/fp223/EquitableEdu
-OUT_DIR="${REPO}/experiment_outputs/slm_vs_llm"
 
-# Knobs (override via --export=ALL,VAR=value at sbatch time)
-LIMIT_CONTEXTS="${LIMIT_CONTEXTS:-0}"        # 0 = use all 179 unique contexts
-FOLDS="${FOLDS:-1 2 3}"                       # space-separated list
-SKIP_GPT4O="${SKIP_GPT4O:-0}"                 # 1 to skip
+# Knobs (override via env-prefix at sbatch submit time, e.g.
+#     CLIENT_ID=1 sbatch slurm/run_compare_fedbart_vs_gpt4o.sh
+# NOTE: do NOT use --export=ALL,VAR=… on this scheduler — that triggers a
+# "user env retrieval failed" hold. Plain env-prefix is what works.
+CLIENT_ID="${CLIENT_ID:-0}"                   # 0=BART, 1=T5, 2=LED
+LIMIT_CONTEXTS="${LIMIT_CONTEXTS:-0}"          # 0 = use all 179 unique contexts
+FOLDS="${FOLDS:-1 2 3}"                        # space-separated list
+SKIP_GPT4O="${SKIP_GPT4O:-0}"
 SKIP_BART="${SKIP_BART:-0}"
 FORCE_REGEN="${FORCE_REGEN:-0}"
+
+# Per-architecture out-dir under a shared parent (so GPT-4o cache can be
+# reused by all 3 runs).
+case "${CLIENT_ID}" in
+    0) ARCH_DIR="bart" ;;
+    1) ARCH_DIR="t5"   ;;
+    2) ARCH_DIR="led"  ;;
+    *) ARCH_DIR="client${CLIENT_ID}" ;;
+esac
+OUT_DIR="${REPO}/experiment_outputs/slm_vs_llm/${ARCH_DIR}"
+GPT4O_CACHE="${GPT4O_CACHE:-${REPO}/experiment_outputs/slm_vs_llm/generations_gpt4o.json}"
 
 export PATH="${HOME}/.local/bin:${REPO}/.venv/bin:${PATH}"
 . /vol/cuda/12.4.0/setup.sh
@@ -77,9 +91,11 @@ else
 fi
 
 echo "================================================================"
-echo "  COMPARE fed-BART vs GPT-4o   job=${SLURM_JOB_ID}  node=$(hostname)"
-echo "  $(date)"
-echo "  LIMIT_CONTEXTS=${LIMIT_CONTEXTS}  FOLDS='${FOLDS}'  "
+echo "  COMPARE fed-SLM (client_${CLIENT_ID}/${ARCH_DIR}) vs GPT-4o"
+echo "  job=${SLURM_JOB_ID}  node=$(hostname)   $(date)"
+echo "  OUT_DIR=${OUT_DIR}"
+echo "  GPT4O_CACHE=${GPT4O_CACHE} (exists: $([ -f "${GPT4O_CACHE}" ] && echo yes || echo no))"
+echo "  LIMIT_CONTEXTS=${LIMIT_CONTEXTS}  FOLDS='${FOLDS}'"
 echo "  SKIP_GPT4O=${SKIP_GPT4O}  SKIP_BART=${SKIP_BART}  FORCE_REGEN=${FORCE_REGEN}"
 echo "================================================================"
 nvidia-smi
@@ -97,6 +113,8 @@ python -u experiments/15_compare_fedbart_vs_gpt4o.py \
     --fed-base-dir     "${REPO}/experiment_outputs/unifiedfl_fp_federated_experiment" \
     --splits-dir       "${REPO}/data/splits" \
     --out-dir          "${OUT_DIR}" \
+    --client-id-bart   "${CLIENT_ID}" \
+    --gpt4o-cache-path "${GPT4O_CACHE}" \
     --folds            ${FOLDS} \
     --limit-contexts   "${LIMIT_CONTEXTS}" \
     --conditioning     topic \
