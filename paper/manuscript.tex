@@ -114,59 +114,42 @@
 \begin{abstract}
 Automated question-answer generation (AQAG) from
 educational materials supports formative assessment
-at scale, but the quality of any locally trained
-AQAG system is bounded by the volume and diversity
-of one institution's curriculum and by the compute
+at scale, but the quality of a locally trained AQAG
+system is bounded by the volume and diversity of
+one institution's curriculum and by the compute
 available to fine-tune a generative model. This
-produces an \textbf{equity gap}: well-resourced
-institutions train pedagogically rich generators,
-while resource-constrained institutions are
-disadvantaged by both narrow curricula and
-lightweight models. Large language models (LLMs)
-would close that gap in principle, but their
-compute, licensing, and data-governance requirements
-put direct deployment out of reach for most
-institutions. Small language models (SLMs)
-encoder-decoder backbones in the 100M--500M
-parameter range run on commodity hardware and keep
-curricular data local, but in isolation they
-inherit the same bounds. We test two complementary
-hypotheses: \textbf{(H1, equity)} a federation of
-SLMs reduces the AQAG quality gap between
-resource-rich and resource-constrained institutions
-while keeping all curricular data private; and
-\textbf{(H2, LLM approximation)} the resulting
-federation approximates the QA-generation quality
-of a single LLM on the same contexts. We introduce
-\UniEdu{}, an architecture-aware federated learning
-framework in which each institution fine-tunes its
-own SLM with a private LoRA adapter and exposes the
-model to the federation only through a coarse
-\emph{architecture graph} whose nodes are
-transformer blocks and whose features summarize
-layer typology and the running statistics of the
-LoRA-adjusted effective weights. A shared graph
-attention network (GAT) encodes these heterogeneous
-graphs into per-block embeddings, and a
-client-local FiLM adapter translates each embedding
-into a residual scale-and-shift modulation of the
-corresponding block's hidden states. Only the GAT
-parameters are federated, via sample-size-weighted
-averaging, so SLMs of fundamentally different
-architectures coexist in one federation without
-dimension-matching constraints. On a public testbed
-of MIT~18.657, Stanford~CS229, and an arXiv ML
-paper corpus, federation lifts every reference-based
-quality metric over per-institution local training
-on a held-out, cross-institution test set, with the
+produces an \textbf{equity gap} between
+well-resourced and resource-constrained
+institutions. Large language models would close
+that gap in principle, but their compute,
+licensing, and data-governance requirements put
+direct deployment out of reach for most
+institutions; small language models (SLMs) run on
+commodity hardware but in isolation inherit the
+same bounds. We introduce \UniEdu{}, an
+architecture-aware federated learning framework in
+which each institution fine-tunes its own SLM with
+a private LoRA adapter and exposes the model only
+through a coarse \emph{architecture graph} whose
+nodes are transformer blocks and whose features
+summarize layer typology and the running statistics
+of the LoRA-adjusted effective weights. A shared
+graph attention network (GAT) encodes these
+heterogeneous graphs into per-block embeddings, and
+a client-local FiLM adapter translates each
+embedding into a residual scale-and-shift
+modulation of the corresponding block's hidden
+states. Only the GAT parameters are federated, via
+sample-size-weighted averaging, so SLMs of
+fundamentally different architectures coexist in
+one federation without dimension-matching
+constraints. On a public testbed of MIT~18.657,
+Stanford~CS229, and an arXiv ML paper corpus,
+federation lifts every reference-based quality
+metric over per-institution local training on a
+held-out, cross-institution test set, with the
 largest gains concentrated on the data-poorest
-institution. We further compare the federated
-mixture against GPT-4o on the same contexts and
-measure QA quality across reference-based,
-reference-free, pedagogical, and LLM-judge axes,
-together with three equity-specific metrics
-(Section~\ref{sec:equity}).
-\red{TODO: tighten the H2 quantitative summary once the OpenAI-enabled comprehensive eval pass and the diverse-LLM zero-shot panel are run.}
+institution.
 \end{abstract}
 
 %% ════════════════════════════════════════════════════════════
@@ -223,20 +206,16 @@ failing, but because of structural disparity in
 institutional resources~\citep{unterhalter2019measuring,
 miao2021artificial}.
 
-\textbf{The two questions we study.}
-\begin{itemize}[leftmargin=1.5em, itemsep=2pt]
-  \item \textbf{H1 (equity).} \emph{Can a federation
-  of SLMs measurably close the AQAG quality gap
-  between resource-rich and resource-constrained
-  institutions, without sharing curricular data?}
-  \item \textbf{H2 (LLM approximation).} \emph{Can a
-  federation of heterogeneous SLMs, trained
-  collaboratively across institutions, approximate
-  the QA-generation quality of a single LLM on the
-  same contexts?}
-\end{itemize}
-H1 is the distributional claim; H2 is the aggregate
-claim. They are tested separately in
+\textbf{The two questions we study} are an
+\emph{equity} claim (does federation measurably
+close the AQAG quality gap between resource-rich
+and resource-constrained institutions, without
+sharing curricular data?) and an
+\emph{LLM-approximation} claim (does a federation
+of heterogeneous SLMs match the QA-generation
+quality of a single LLM on the same contexts?).
+Both are stated formally in
+Section~\ref{sec:scenario} and tested separately in
 Section~\ref{sec:experiments}.
 
 A direct route to that goal is federated
@@ -918,7 +897,7 @@ Optimization uses AdamW with a cosine schedule and
 linear warm-up; mini-batches use BF16 autocast on the
 LM forward.
 
-\subsection{Federated Optimization}
+\subsection{Unified Federated Optimization}
 \label{sec:fed_opt}
 
 \textbf{Round structure.}
@@ -1359,9 +1338,9 @@ the same evaluation suite:
   \item \textbf{Gemini-1.5-Flash}.
 \end{itemize}
 The H2 panel is reported separately
-(Section~\ref{sec:results_llm_approx},
-Appendix~\ref{app:llm_baselines}); these LLMs do not
-appear as rows in the per-institution H1 tables.
+(Section~\ref{sec:results_llm_approx}); these LLMs
+do not appear as rows in the per-institution H1
+tables.
 
 \subsection{Hyperparameters}
 \label{sec:hyperparams}
@@ -2095,11 +2074,20 @@ contexts zero-shot. The single number reported per
 metric for \UniEdu{} aggregates over institutions
 either by mean (text-overlap, NLI, faithfulness,
 LLM-judge) or by their mean Pairwise Equity Score
-$\bar{E}$. The LLM rows are produced by prompting
-each model once per test context with the same
-template, then scoring the resulting $(q, a)$ with
-the same evaluation suite (prompt in
-Appendix~\ref{app:llm_baselines}).
+$\bar{E}$. The reference panel is the six
+zero-shot LLMs \texttt{gpt-4o},
+\texttt{gpt-4o-mini},
+\texttt{Llama-3.1-8B-Instruct},
+\texttt{Qwen-2.5-7B-Instruct},
+\texttt{Mistral-7B-Instruct-v0.3}, and
+\texttt{Gemini-1.5-Flash}. Each LLM is prompted
+once per test context with the same fixed template
+(greedy decoding,
+\texttt{temperature{=}0.0},
+\texttt{max\_tokens{=}256}), and the resulting
+$(q, a)$ is scored with the same evaluation suite
+as \UniEdu{}. The full LLM-judge prompt is
+reproduced in Appendix~\ref{app:llm_judge_prompt}.
 
 \red{TODO: single-LLM zero-shot panel (GPT-4o, GPT-4o-mini, Llama-3.1-8B-Inst, Qwen-2.5-7B-Inst, Mistral-7B-Inst, Gemini-1.5-Flash) not yet collected; UniEdu federated-mixture row also pending the OpenAI-enabled re-run.}
 \begin{table*}[t]
@@ -2501,24 +2489,6 @@ institutions (110 chunks each, deterministic with
 seed~$=42$).
 
 \red{TODO: insert side-by-side comparison table once Phase~2 finishes for both variants. Expectation: the GAT-mediated transfer should remain measurable in the balanced setting, isolating the federation effect from raw data-quantity effects.}
-
-\section{Diverse-LLM Reference Panel}
-\label{app:llm_baselines}
-
-We report a zero-shot reference panel against
-diverse LLMs as additional ceilings, using a fixed
-prompt that asks for a $(q, a)$ pair from the test
-context. Models: \texttt{gpt-4o},
-\texttt{gpt-4o-mini}, \texttt{Llama-3.1-8B-Instruct},
-\texttt{Qwen-2.5-7B-Instruct},
-\texttt{Mistral-7B-Instruct-v0.3},
-\texttt{Gemini-1.5-Flash}. Decoding is greedy with
-\texttt{temperature{=}0.0} and
-\texttt{max\_tokens{=}256} for the chat models. Each
-model's outputs are scored with the same evaluation
-suite as \UniEdu{}.
-
-\red{TODO: insert Table comparing the diverse-LLM panel against \UniEdu{} on the public-testbed mean.}
 
 \section{Architecture Graph Examples}
 \label{app:graph_examples}
