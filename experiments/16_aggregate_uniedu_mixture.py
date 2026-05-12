@@ -179,7 +179,7 @@ def format_table(arch_summaries: List[Dict[str, Any]],
         out.append(f"  {slice_label:10s}  {'GPT-4o':24s}  "
                    f"{'  '.join(f'{c:>14s}' for c in cells)}    {n}")
 
-        # Delta: GPT-4o − UniEdu mixture
+        # Delta: UniEdu mixture − GPT-4o (positive ⇒ mixture beats GPT-4o)
         cells = []
         for mk in METRIC_KEYS:
             mu = mixture[slice_key][mk]["mean"]
@@ -187,9 +187,10 @@ def format_table(arch_summaries: List[Dict[str, Any]],
             if mu is None or v is None or math.isnan(mu):
                 cells.append(f"{'--':>14s}")
             else:
-                sign = "+" if v >= mu else ""
-                cells.append(f"{sign}{v - mu:.4f}".rjust(14))
-        out.append(f"  {'':10s}  {'  delta (GPT − mix)':24s}  "
+                d = mu - v
+                sign = "+" if d >= 0 else ""
+                cells.append(f"{sign}{d:.4f}".rjust(14))
+        out.append(f"  {'':10s}  {'  delta (mix − GPT)':24s}  "
                    + "  ".join(cells))
         out.append("")
 

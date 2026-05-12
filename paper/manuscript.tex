@@ -1890,17 +1890,20 @@ $(q, a)$ is scored with the same evaluation suite
 as \UniEdu{}. The full LLM-judge prompt is
 reproduced in Appendix~\ref{app:llm_judge_prompt}.
 
-\red{TODO: single-LLM zero-shot panel (GPT-4o, GPT-4o-mini, Llama-3.1-8B-Inst, Qwen-2.5-7B-Inst, Mistral-7B-Inst, Gemini-1.5-Flash) not yet collected; UniEdu federated-mixture row also pending the OpenAI-enabled re-run.}
+\red{TODO: UniEdu (fed.\ mixture) and GPT-4o rows populated for the 4 lightweight columns (R-L, B-4, BERT, B-EVS) on the public-testbed global mixed test set (916 rows, mean over 3 folds, mean over 3 backbone architectures for UniEdu). Heavy reference-free columns (RTC, Faith, QAFE, RQU) and the LLM-judge column (LLM-J) still pending. Other zero-shot LLM rows (GPT-4o-mini, Llama-3.1-8B-Inst, Qwen-2.5-7B-Inst, Mistral-7B-Inst, Gemini-1.5-Flash) not yet collected.}
 \begin{table*}[t]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{3pt}
 \caption{H2 (LLM approximation): the \UniEdu{}
 federated mixture compared against zero-shot
-single-LLM baselines on the public-testbed val set
-(mean over 3 folds). The federated mixture row is
-\UniEdu{} averaged across the institutions in the
-public testbed. Column abbreviations match
+single-LLM baselines on the public-testbed
+global mixed test set (916 rows, union of the three
+per-institution test splits; mean over 3 folds). The
+federated mixture row is \UniEdu{} averaged across
+the three backbone architectures
+(BART/Flan-T5/LED-base) deployed in the public
+testbed. Column abbreviations match
 Table~\ref{tab:headline_global}; B-EVS is the
 local Bloom's classifier under EVS. Bold = best per metric.}
 \label{tab:llm_approx}
@@ -1911,9 +1914,9 @@ local Bloom's classifier under EVS. Bold = best per metric.}
 \textbf{RTC} & \textbf{Faith} & \textbf{QAFE} &
 \textbf{RQU} & \textbf{B-EVS} & \textbf{LLM-J} \\
 \midrule
-\UniEdu{} (fed.\ mixture) & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+\UniEdu{} (fed.\ mixture) & 0.4394 & 0.1688 & 0.8629 & -- & -- & -- & -- & 0.2296 & -- \\
 \midrule
-GPT-4o              & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+GPT-4o              & \textbf{0.4487} & \textbf{0.1869} & \textbf{0.8725} & -- & -- & -- & -- & \textbf{0.2624} & -- \\
 GPT-4o-mini         & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 Llama-3.1-8B-Inst   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 Qwen-2.5-7B-Inst    & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
