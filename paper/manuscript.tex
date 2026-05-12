@@ -932,45 +932,9 @@ protocol.
 
 \red{TODO: confirm any client-sampling deviation from the all-clients-each-round default; verify final round counts and any warm-up.}
 
-\begin{algorithm}[t]
-\caption{\UniEdu{}: unified federated learning for AQAG.}
-\label{alg:unifiededu}
-\begin{algorithmic}[1]
-\Require $m$ institutions; private datasets
-  $\{\mathcal{D}_k\}$; private LoRA $\{\mathbf{L}_k\}$;
-  private FiLM $\{\boldsymbol{\psi}_k\}$; rounds $T$;
-  initial $\boldsymbol{\phi}^{[0]}$; learning rate
-  $\eta$.
-\Ensure $\boldsymbol{\phi}^{[T]}$ and per-client
-  $(\mathbf{L}_k, \boldsymbol{\psi}_k)$.
-\For{each institution $k$}
-  \State Build $\mathcal{G}_k$ from local backbone (once).
-\EndFor
-\For{$t = 1,\ldots,T$}
-  \State Server broadcasts $\boldsymbol{\phi}^{[t-1]}$.
-  \For{each institution $k$ in parallel}
-    \For{each local mini-batch
-         $(c, q, a) \in \mathcal{D}_k$}
-      \State Refresh effective-weight node features.
-      \State $(\mathbf{Z}_k, \mathbf{z}_k^{\text{graph}})
-             \leftarrow g(\mathcal{G}_k;
-             \boldsymbol{\phi})$.
-      \State Update FiLM hooks; LM forward + backward.
-      \State AdamW step on
-             $(\boldsymbol{\phi}, \mathbf{L}_k,
-             \boldsymbol{\psi}_k)$.
-    \EndFor
-    \State Upload
-      $\boldsymbol{\phi}^{[t]}_{(k)}$.
-  \EndFor
-  \State Server: $\boldsymbol{\phi}^{[t]} \leftarrow
-         \sum_k \frac{n_k}{\sum_j n_j}
-         \boldsymbol{\phi}^{[t]}_{(k)}$.
-\EndFor
-\State \Return $\boldsymbol{\phi}^{[T]},
-       \{(\mathbf{L}_k, \boldsymbol{\psi}_k)\}$.
-\end{algorithmic}
-\end{algorithm}
+The full per-round pseudocode is given in
+Algorithm~\ref{alg:unifiededu}
+(Appendix~\ref{app:algorithm}).
 
 %% ════════════════════════════════════════════════════════════
 \section{Experimental Setup}
@@ -1395,73 +1359,32 @@ Equity           & Pairwise Equity; Knowledge Transfer
 \end{tabular}
 \end{table}
 
-\subsection{Question Quality: RQUGE}
-\label{sec:rquge}
+\subsection{Question, Answer, and Joint Quality}
+\label{sec:qa_quality}
 
-\textbf{RQUGE}~\citep{mohammadshahi2023rquge} is a
-reference-free metric that scores question quality
-through answerability. Given context $c$, candidate
-question $q$, and gold answer span $a_r$ (the
-generated $a$):
-\begin{equation}
-  a_c = \mathrm{QA}(q, c),\qquad
-  \kappa = S(q, a_c, a_r, c),
-  \label{eq:rquge}
-\end{equation}
-where $\mathrm{QA}(\cdot)$ is
-UnifiedQA-v2~\citep{khashabi2022unifiedqa} and
-$S(\cdot)$ is a span-quality scorer; $\kappa \in [1,
-5]$. We use a BERTScore-based approximation of
-$S(\cdot)$, scaled to $[1, 5]$ via $\kappa = 1 + 4
-\cdot \mathrm{BERTScore\text{-}F1}$ (clamped).
-
-\subsection{Answer Quality}
-\label{sec:answer_quality}
-
-\textbf{RAGAS Faithfulness}~\citep{es2023ragas}
-decomposes $a$ into atomic claims $\mathcal{S}(a)$
-(by NLTK sentence splitting, or by a GPT-4o-mini
-decomposer when an OpenAI key is provided) and
-verifies each claim with an NLI
-model~\citep{he2021deberta}:
-\begin{equation}
-  \mathrm{Faithfulness}(a, c)
-  = \frac{1}{|\mathcal{S}(a)|}\!
-    \sum_i \mathbf{1}[\mathrm{NLI}(c, s_i){=}\texttt{ENT}].
-  \label{eq:faithfulness}
-\end{equation}
-
-\textbf{QAFactEval}~\citep{fabbri2022qafacteval} is
-approximated via UnifiedQA: each sentence-level claim
-is wrapped in a yes/no probe answered against $c$;
-the score is the mean ``yes'' rate.
-
-\subsection{Joint Question-Answer Quality}
-\label{sec:joint_quality}
-
-\textbf{Round-Trip Consistency (RTC)}, inspired by
-\citet{alberti2019synthetic}:
-\begin{equation}
-  \mathrm{RTC}(q, a, c)
-  = \mathrm{F1}_{\text{tok}}\!\left(
-      \mathrm{QA}(q, c), a
-    \right).
-  \label{eq:rtc}
-\end{equation}
-We use token-level F1 (rather than the original
-exact-match) for a continuous score suitable for
-cross-paradigm comparison.
-
-\textbf{RAGAS Answer Relevancy}~\citep{es2023ragas}
-generates $n$ reverse questions $\{\hat{q}_i\}$ from
-$a$ and computes:
-\begin{equation}
-  \mathrm{AR}(q, a) =
-  \tfrac{1}{n}\!\sum_{i=1}^{n}
-    \frac{\mathbf{e}_q^{\!\top}\mathbf{e}_{\hat{q}_i}}
-         {\|\mathbf{e}_q\|\,\|\mathbf{e}_{\hat{q}_i}\|}.
-  \label{eq:answer_relevancy}
-\end{equation}
+\textbf{Question quality} is measured by
+\textbf{RQUGE}~\citep{mohammadshahi2023rquge}, a
+reference-free answerability score that runs a QA
+model on $(q, c)$ and compares the predicted span to
+the generated answer; we use a BERTScore-based span
+scorer scaled to $[1,5]$. \textbf{Answer quality} is
+measured by RAGAS
+\textbf{Faithfulness}~\citep{es2023ragas} (NLI
+entailment rate of atomic answer claims against the
+context, via DeBERTa~\citep{he2021deberta}) and an
+approximation of
+\textbf{QAFactEval}~\citep{fabbri2022qafacteval}
+based on UnifiedQA~\citep{khashabi2022unifiedqa}.
+\textbf{Joint QA quality} is measured by Round-Trip
+Consistency, inspired by
+\citet{alberti2019synthetic} (token-F1 between the
+generated answer and a re-derived answer obtained
+by running a QA model on $(q, c)$), and by RAGAS
+\textbf{Answer Relevancy}~\citep{es2023ragas}
+(cosine similarity between the original question and
+embeddings of $n$ reverse-generated questions). Full
+formulations are deferred to
+Appendix~\ref{app:eval_formulations}.
 
 \subsection{Pedagogical Quality}
 \label{sec:pedagogical}
@@ -1470,30 +1393,17 @@ We adopt \textbf{Bloom's Revised
 Taxonomy}~\citep{anderson2001taxonomy} (six levels:
 Remember, Understand, Apply, Analyze, Evaluate,
 Create) and assess cognitive depth via two
-independent classifiers:
-
-\textbf{Bloom's BERT classifier.} A publicly
-available BERT-base classifier
+independent classifiers: a publicly available
+\textbf{Bloom's BERT classifier}
 (\texttt{cip29/bert-blooms-taxonomy-classifier})
-fine-tuned on Bloom's-labeled question data:
-\begin{equation}
-  \hat{b}(q) = \argmax_{b}\,
-    \mathrm{softmax}(W \cdot \mathrm{BERT}(q))_b.
-  \label{eq:bloom_bert}
-\end{equation}
-
-\textbf{Bloom's LLM judge.} GPT-4o-mini queried with
-a structured prompt that supplies the six levels with
-verb-anchored definitions and asks for a JSON output
-$\{\texttt{level}, \texttt{reason}\}$.
-
-The Bloom's level is normalized to a continuous
-\textbf{Educational Value Score}:
-\begin{equation}
-  \mathrm{EVS}(q) = \tfrac{\hat{b}(q) - 1}{5}
-  \in [0, 1].
-  \label{eq:evs}
-\end{equation}
+fine-tuned on Bloom's-labeled question data, and a
+\textbf{Bloom's LLM judge} (GPT-4o-mini queried with
+a structured prompt that supplies verb-anchored
+definitions of the six levels and returns a JSON
+$\{\texttt{level}, \texttt{reason}\}$ object). The
+Bloom's level is normalized to a continuous
+\textbf{Educational Value Score} in $[0, 1]$ via
+$\mathrm{EVS}(q) = (\hat{b}(q) - 1) / 5$.
 
 \subsection{LLM QA-Quality Judge}
 \label{sec:llm_judge}
@@ -1504,102 +1414,46 @@ rates each $(c, q, a)$ on a strict 1--5 rubric for
 \emph{answer correctness}, and \emph{answer relevance},
 with verb-anchored anchors at levels 1, 3, 5
 (prompt in Appendix~\ref{app:llm_judge_prompt}).
-Aggregated overall $\in [0, 1]$ via
-$(\bar{s} - 1)/4$.
+The overall score is the four-dimension mean
+normalised to $[0, 1]$ via $(\bar{s} - 1)/4$.
 
 \subsection{Equity Evaluation}
 \label{sec:equity}
 
 Let $m \in \{\indiv, \fed, \uni\}$ denote the
 learning paradigm. $Q_k^{(m)}$ is institution $k$'s
-aggregate quality (default: LLM-judge overall);
-$\mathcal{C}_k$ its curricular richness;
-$\mathcal{R}_k$ its compute resource (trainable
-parameter count of the deployed backbone, normalized
-by the largest in the federation).
+aggregate QA quality under paradigm $m$ (default:
+LLM-judge overall); $\mathcal{C}_k$ its curricular
+richness; $\mathcal{R}_k$ its compute resource
+(trainable parameter count of the deployed backbone,
+normalised by the largest in the federation). We
+assess equity through three complementary
+quantities. The \textbf{Pairwise Equity Score (PES)}
+$E_{kl}^{(m)}$ rewards configurations that lift both
+institutions of a $(k, l)$ pair simultaneously
+relative to their gap in $(\mathcal{C}, \mathcal{R})$;
+the central hypothesis is $E_{kl}^{(\uni)} >
+E_{kl}^{(\fed)} > E_{kl}^{(\indiv)}$. The
+\textbf{Anchor Question Equity Score} fixes a
+shared anchor question $q^*$ and uses an LLM Equity
+Judge to compare $s_l^{(\uni)}$, $s_k^{(\indiv)}$,
+$s_l^{(\indiv)}$ for pairs $(k, l)$ with
+$\mathcal{C}_k > \mathcal{C}_l$ and $\mathcal{R}_k =
+\mathcal{R}_l$, predicting $s_l^{(\uni)} \approx
+s_k^{(\indiv)} > s_l^{(\indiv)}$. The
+\textbf{Knowledge Transfer Index} $\mathrm{KTI}(l
+\leftarrow k) = Q_l^{(\uni)}(\mathcal{T}_{k\setminus
+l}) - Q_l^{(\indiv)}(\mathcal{T}_{k\setminus l})$
+isolates cross-client transfer on
+topics exclusive to $k$'s curriculum; the
+\UniEdu{}-noFiLM ablation
+(Section~\ref{sec:baselines}) is the natural
+control, since killing the conditioning channel
+should drive KTI to zero. Full definitions,
+derivations, and reference implementations are in
+Appendix~\ref{app:equity_derivations}.
 
-\subsubsection{Pairwise Equity Score}
-\label{sec:pairwise_equity}
-
-\begin{definition}[Pairwise Equity Score]
-\begin{equation}
-  E_{kl}^{(m)}
-  = \frac{Q_k^{(m)} + Q_l^{(m)}}
-         {|\mathcal{C}_k - \mathcal{C}_l|
-          + |\mathcal{R}_k - \mathcal{R}_l| + \varepsilon},
-  \label{eq:pairwise_equity}
-\end{equation}
-where $\varepsilon{=}10^{-6}$ stabilizes the
-denominator when resources are nearly matched.
-\end{definition}
-
-\begin{remark}
-A high $E_{kl}^{(m)}$ rewards configurations in
-which both institutions benefit \emph{simultaneously},
-not configurations that close the gap by degrading
-the stronger institution.
-\end{remark}
-
-The central hypothesis predicts:
-\begin{equation}
-  \boxed{E_{kl}^{(\uni)} > E_{kl}^{(\fed)} >
-         E_{kl}^{(\indiv)}}
-  \label{eq:equity_ordering}
-\end{equation}
-where $(\fed)$ is well-defined only for
-same-architecture pairs; for cross-architecture pairs
-the ordering reduces to $E_{kl}^{(\uni)} >
-E_{kl}^{(\indiv)}$.
-
-\subsubsection{Anchor Question Equity Score}
-\label{sec:anchor_equity}
-
-\begin{definition}[Anchor Question Setup]
-Let $q^*$ be a fixed anchor question covering a core
-ML concept. Consider $k, l$ with
-\begin{equation}
-  \mathcal{C}_k > \mathcal{C}_l,\qquad
-  \mathcal{R}_k = \mathcal{R}_l.
-  \label{eq:anchor_condition}
-\end{equation}
-\end{definition}
-
-An LLM Equity Judge (constrained-rubric GPT-4o)
-scores each model's response to $q^*$:
-$s_k^{(\indiv)}$, $s_l^{(\indiv)}$, $s_l^{(\uni)}
-\in [0, 1]$.
-
-\begin{proposition}[Anchor Equity Hypothesis]
-Under Eq.~\ref{eq:anchor_condition}:
-\begin{equation}
-  \boxed{s_l^{(\uni)} \approx s_k^{(\indiv)} >
-         s_l^{(\indiv)}}
-  \label{eq:anchor_hypothesis}
-\end{equation}
-\end{proposition}
-
-\red{TODO: confirm at least one collaborator pair satisfies Eq.~\ref{eq:anchor_condition}, or operationalize an approximate matching by binning $\mathcal{R}_k$.}
-
-\subsubsection{Knowledge Transfer Index}
-\label{sec:kti}
-
-To distinguish knowledge transfer from regularization:
-\begin{equation}
-  \mathrm{KTI}(l \leftarrow k)
-  = Q_l^{(\uni)}(\mathcal{T}_{k\setminus l})
-  - Q_l^{(\indiv)}(\mathcal{T}_{k\setminus l}),
-  \label{eq:kti}
-\end{equation}
-where $\mathcal{T}_{k\setminus l}$ is a held-out test
-set covering topics exclusive to $k$'s curriculum.
-A positive KTI on these items provides direct
-evidence of cross-institutional transfer rather than a
-regularization artifact of GAT averaging. The
-\textbf{\UniEdu{}-noFiLM} ablation
-(§\ref{sec:baselines}) is the natural control: if
-KTI persists in full \UniEdu{} but vanishes in
-\UniEdu{}-noFiLM, the conditioning channel carries
-the cross-client knowledge.
+\red{TODO: confirm at least one collaborator pair satisfies $\mathcal{C}_k > \mathcal{C}_l, \mathcal{R}_k = \mathcal{R}_l$, or operationalize an approximate matching by binning $\mathcal{R}_k$.}
 
 \subsection{Statistical Validation}
 \label{sec:stats}
@@ -1607,30 +1461,25 @@ the cross-client knowledge.
 For each institution $k$ and each metric $Q$, we
 collect per-sample score vectors
 $\mathcal{D}_k^{(\indiv)}$ and $\mathcal{D}_k^{(\uni)}$
-from val-set evaluation under each paradigm. We apply
-a one-sided \textbf{paired Wilcoxon signed-rank test}
-(preferred over the paired $t$-test, since NLP
-quality scores are typically non-Gaussian and bounded):
-\begin{equation}
-  H_0: \mu_{Q^{(\uni)}} = \mu_{Q^{(\indiv)}},\quad
-  H_1: \mu_{Q^{(\uni)}} > \mu_{Q^{(\indiv)}}.
-  \label{eq:hypothesis_test}
-\end{equation}
-We report $p$-values at $\alpha{=}0.05$ with
-\textbf{Bonferroni correction} across the (metric,
-institution) grid, \textbf{Cohen's} $d$ for effect
-size, and \textbf{95\,\% bootstrap CIs}
-($B{=}10{,}000$).
+from val-set evaluation under each paradigm. We
+apply a one-sided \textbf{paired Wilcoxon
+signed-rank test} (preferred over the paired
+$t$-test, since NLP quality scores are typically
+non-Gaussian and bounded) with $H_1: \mu_{Q^{(\uni)}}
+> \mu_{Q^{(\indiv)}}$. We report $p$-values at
+$\alpha{=}0.05$ with \textbf{Bonferroni correction}
+across the (metric, institution) grid,
+\textbf{Cohen's} $d$ for effect size, and
+\textbf{95\,\% bootstrap CIs} ($B{=}10{,}000$).
 
 %% ════════════════════════════════════════════════════════════
 \section{Results}
 \label{sec:results}
 
 The two hypotheses (Section~\ref{sec:scenario}) are
-reported separately. Section~\ref{sec:results_equity} and
-Section~\ref{sec:results_kti} test \textbf{H1} (equity)
-by comparing \UniEdu{} against per-institution local
-training. The result for the equity story is
+reported separately. Section~\ref{sec:results_equity}
+tests \textbf{H1} (equity) by comparing \UniEdu{}
+against per-institution local training. The result for the equity story is
 \emph{per-institution}; GPT-4o does not appear as a
 row. Section~\ref{sec:results_llm_approx} tests
 \textbf{H2} (LLM approximation) by aggregating
@@ -1949,7 +1798,8 @@ task-level knowledge: the only way for institution
 $k$'s inductive bias to reach institution $l$'s
 outputs is through the conditioning that
 $\boldsymbol{\phi}$ imposes on $l$'s FiLM modulator.
-The KTI metric (§\ref{sec:kti}) and the
+The KTI metric (Section~\ref{sec:equity};
+Appendix~\ref{app:equity_derivations}) and the
 \UniEdu{}-noFiLM ablation are designed to measure
 exactly this indirect transfer.
 
@@ -2265,6 +2115,160 @@ $|\mathcal{T}_2|{=}755$; the global test pool
 $\mathcal{T}^{\text{global}}$ is their concatenation
 ($916$ samples).
 
+\section{Federated Algorithm Pseudocode}
+\label{app:algorithm}
+
+Algorithm~\ref{alg:unifiededu} formalises one round
+of the unified federated optimization described in
+Section~\ref{sec:fed_opt}: each institution refreshes
+its architecture-graph node features at every
+mini-batch, runs the shared GAT to obtain per-block
+embeddings, updates its private LoRA and FiLM
+parameters jointly with the local copy of the GAT
+parameters, and uploads only $\boldsymbol{\phi}$ to
+the server for sample-size-weighted FedAvg
+aggregation.
+
+\begin{algorithm}[t]
+\caption{\UniEdu{}: unified federated learning for AQAG.}
+\label{alg:unifiededu}
+\begin{algorithmic}[1]
+\Require $m$ institutions; private datasets
+  $\{\mathcal{D}_k\}$; private LoRA $\{\mathbf{L}_k\}$;
+  private FiLM $\{\boldsymbol{\psi}_k\}$; rounds $T$;
+  initial $\boldsymbol{\phi}^{[0]}$; learning rate
+  $\eta$.
+\Ensure $\boldsymbol{\phi}^{[T]}$ and per-client
+  $(\mathbf{L}_k, \boldsymbol{\psi}_k)$.
+\For{each institution $k$}
+  \State Build $\mathcal{G}_k$ from local backbone (once).
+\EndFor
+\For{$t = 1,\ldots,T$}
+  \State Server broadcasts $\boldsymbol{\phi}^{[t-1]}$.
+  \For{each institution $k$ in parallel}
+    \For{each local mini-batch
+         $(c, q, a) \in \mathcal{D}_k$}
+      \State Refresh effective-weight node features.
+      \State $(\mathbf{Z}_k, \mathbf{z}_k^{\text{graph}})
+             \leftarrow g(\mathcal{G}_k;
+             \boldsymbol{\phi})$.
+      \State Update FiLM hooks; LM forward + backward.
+      \State AdamW step on
+             $(\boldsymbol{\phi}, \mathbf{L}_k,
+             \boldsymbol{\psi}_k)$.
+    \EndFor
+    \State Upload
+      $\boldsymbol{\phi}^{[t]}_{(k)}$.
+  \EndFor
+  \State Server: $\boldsymbol{\phi}^{[t]} \leftarrow
+         \sum_k \frac{n_k}{\sum_j n_j}
+         \boldsymbol{\phi}^{[t]}_{(k)}$.
+\EndFor
+\State \Return $\boldsymbol{\phi}^{[T]},
+       \{(\mathbf{L}_k, \boldsymbol{\psi}_k)\}$.
+\end{algorithmic}
+\end{algorithm}
+
+\section{Evaluation Metric Formulations}
+\label{app:eval_formulations}
+
+This appendix gives the formal definitions of every
+non-equity evaluation metric whose body description
+(Section~\ref{sec:evaluation}) is prose only.
+Equity-metric derivations are in
+Appendix~\ref{app:equity_derivations}.
+
+\paragraph{RQUGE (Question Quality).}
+\textbf{RQUGE}~\citep{mohammadshahi2023rquge} is a
+reference-free metric that scores question quality
+through answerability. Given context $c$, candidate
+question $q$, and gold answer span $a_r$ (the
+generated $a$):
+\begin{equation}
+  a_c = \mathrm{QA}(q, c),\qquad
+  \kappa = S(q, a_c, a_r, c),
+  \label{eq:rquge}
+\end{equation}
+where $\mathrm{QA}(\cdot)$ is
+UnifiedQA-v2~\citep{khashabi2022unifiedqa} and
+$S(\cdot)$ is a span-quality scorer; $\kappa \in [1,
+5]$. We use a BERTScore-based approximation of
+$S(\cdot)$, scaled to $[1, 5]$ via $\kappa = 1 + 4
+\cdot \mathrm{BERTScore\text{-}F1}$ (clamped).
+
+\paragraph{RAGAS Faithfulness (Answer Quality).}
+\textbf{RAGAS Faithfulness}~\citep{es2023ragas}
+decomposes $a$ into atomic claims $\mathcal{S}(a)$
+(by NLTK sentence splitting, or by a GPT-4o-mini
+decomposer when an OpenAI key is provided) and
+verifies each claim with an NLI
+model~\citep{he2021deberta}:
+\begin{equation}
+  \mathrm{Faithfulness}(a, c)
+  = \frac{1}{|\mathcal{S}(a)|}\!
+    \sum_i \mathbf{1}[\mathrm{NLI}(c, s_i){=}\texttt{ENT}].
+  \label{eq:faithfulness}
+\end{equation}
+\textbf{QAFactEval}~\citep{fabbri2022qafacteval} is
+approximated via UnifiedQA: each sentence-level claim
+is wrapped in a yes/no probe answered against $c$;
+the score is the mean ``yes'' rate.
+
+\paragraph{Round-Trip Consistency (Joint QA Quality).}
+RTC, inspired by \citet{alberti2019synthetic}:
+\begin{equation}
+  \mathrm{RTC}(q, a, c)
+  = \mathrm{F1}_{\text{tok}}\!\left(
+      \mathrm{QA}(q, c), a
+    \right).
+  \label{eq:rtc}
+\end{equation}
+We use token-level F1 (rather than the original
+exact-match) for a continuous score suitable for
+cross-paradigm comparison.
+
+\paragraph{RAGAS Answer Relevancy (Joint QA Quality).}
+\textbf{RAGAS Answer Relevancy}~\citep{es2023ragas}
+generates $n$ reverse questions $\{\hat{q}_i\}$ from
+$a$ and computes:
+\begin{equation}
+  \mathrm{AR}(q, a) =
+  \tfrac{1}{n}\!\sum_{i=1}^{n}
+    \frac{\mathbf{e}_q^{\!\top}\mathbf{e}_{\hat{q}_i}}
+         {\|\mathbf{e}_q\|\,\|\mathbf{e}_{\hat{q}_i}\|}.
+  \label{eq:answer_relevancy}
+\end{equation}
+
+\paragraph{Bloom's BERT Classifier (Pedagogical Quality).}
+A BERT-base classifier
+(\texttt{cip29/bert-blooms-taxonomy-classifier})
+fine-tuned on Bloom's-labeled question data
+predicts a Bloom level $\hat{b}(q) \in \{1,
+\ldots, 6\}$:
+\begin{equation}
+  \hat{b}(q) = \argmax_{b}\,
+    \mathrm{softmax}(W \cdot \mathrm{BERT}(q))_b.
+  \label{eq:bloom_bert}
+\end{equation}
+The predicted level is normalised to a continuous
+\textbf{Educational Value Score} in $[0, 1]$:
+\begin{equation}
+  \mathrm{EVS}(q) = \tfrac{\hat{b}(q) - 1}{5}
+  \in [0, 1].
+  \label{eq:evs}
+\end{equation}
+
+\paragraph{Paired Wilcoxon Signed-Rank Test
+(Statistical Validation).}
+The body Section~\ref{sec:stats} uses a one-sided
+paired Wilcoxon signed-rank test with the
+hypotheses
+\begin{equation}
+  H_0: \mu_{Q^{(\uni)}} = \mu_{Q^{(\indiv)}},\quad
+  H_1: \mu_{Q^{(\uni)}} > \mu_{Q^{(\indiv)}}.
+  \label{eq:hypothesis_test}
+\end{equation}
+
 \section{Public Testbed Reproducibility}
 \label{app:reproducibility}
 
@@ -2366,19 +2370,22 @@ and the \emph{Anchor Question Equity} score
 \paragraph{Pairwise Equity Score (PES).}
 For paradigm $m \in \{\indiv, \fed, \uni\}$ and any
 two institutions $k, l$:
-\begin{equation*}
+\begin{equation}
   E_{kl}^{(m)} =
   \frac{Q_k^{(m)} + Q_l^{(m)}}
        {|\mathcal{C}_k - \mathcal{C}_l| +
         |\mathcal{R}_k - \mathcal{R}_l| + \varepsilon}.
-\end{equation*}
+  \label{eq:pairwise_equity}
+\end{equation}
 Inputs: $Q_k^{(m)}$ is institution $k$'s aggregate
 QA-quality score under paradigm $m$ (we use the
 LLM-judge overall by default; any of the metrics in
 Tables~\ref{tab:headline_global}--\ref{tab:equity_private}
 also work). $\mathcal{C}_k$ is curricular richness
-(Eq.~\ref{eq:richness}), normalized to $[0, 1]$
-across the federation. $\mathcal{R}_k$ is the
+(a per-institution proxy combining chunk count and
+topic diversity; \red{TODO: spell out the exact
+formula}), normalized to $[0, 1]$ across the
+federation. $\mathcal{R}_k$ is the
 trainable-parameter count of $k$'s SLM, normalized
 to $[0, 1]$ by dividing by the largest in the
 federation. $\varepsilon = 10^{-6}$.
@@ -2401,11 +2408,12 @@ small helper script
 
 \paragraph{Knowledge Transfer Index (KTI).}
 For a directed pair $(l \leftarrow k)$:
-\begin{equation*}
+\begin{equation}
   \mathrm{KTI}(l \leftarrow k) =
   Q_l^{(\uni)}(\mathcal{T}_{k\setminus l}) -
   Q_l^{(\indiv)}(\mathcal{T}_{k\setminus l}).
-\end{equation*}
+  \label{eq:kti}
+\end{equation}
 $\mathcal{T}_{k\setminus l}$ is constructed from
 the union of held-out chunks whose
 \texttt{question\_topic} field appears in $k$'s
@@ -2423,9 +2431,12 @@ For pairs $(k, l)$ satisfying $\mathcal{C}_k >
 when no exact match exists), the LLM Equity Judge
 scores each model's response to a fixed anchor
 question $q^*$. The hypothesis is
-$s_l^{(\uni)} \approx s_k^{(\indiv)} > s_l^{(\indiv)}$:
-the federated low-resource client matches the
-high-resource individual, and beats the
+\begin{equation}
+  s_l^{(\uni)} \approx s_k^{(\indiv)} > s_l^{(\indiv)},
+  \label{eq:anchor_hypothesis}
+\end{equation}
+that is, the federated low-resource client matches
+the high-resource individual, and beats the
 low-resource individual.
 
 \paragraph{Failure modes.}
