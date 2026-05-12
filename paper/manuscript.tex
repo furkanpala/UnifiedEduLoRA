@@ -1693,7 +1693,15 @@ li2019fedmd, lin2020feddf, cheng2022fedet} did not
 attempt, therefore does not impose an accuracy cost
 for architectural diversity: the data-poor client
 is the one that benefits most from the shared
-inductive bias.
+inductive bias. Supplementary breakdowns --- the in-distribution
+local val/test view (Table~\ref{tab:val_test}),
+pedagogical and LLM-judge metrics on the public
+testbed (Tables~\ref{tab:public_pedagogical}--\ref{tab:public_llm_judge_dims}),
+conditioning ablations (Table~\ref{tab:public_ablation}),
+per-institution uplift (Table~\ref{tab:uplift}), and
+the Knowledge Transfer Index
+(Table~\ref{tab:kti}) --- are reported in
+Appendix~\ref{app:supp_results}.
 
 \red{TODO: re-run all (client, fold) cells with --no-heavy off + an OpenAI key to populate the LLM-based block (RTC, Faith., QAFE, RQUGE, Ans-Rel, Bloom-LLM EVS, LLM-judge overall). The current --fast-eval pass produced only the four lightweight columns.}
 \begin{table*}[t]
@@ -1751,64 +1759,6 @@ rubric dimensions normalized to $[0,1]$.}
 \multirow{2}{*}{Mean across $\mathcal{I}_{0,1,2}$}
   & \indiv     & 0.4319 & 0.1617 & 0.8603 & 0.2244 & --- & --- & --- & --- & --- & --- & --- \\
   & \UniEdu{}  & \textbf{0.4406} & \textbf{0.1736} & \textbf{0.8643} & \textbf{0.2284} & --- & --- & --- & --- & --- & --- & --- \\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-\red{TODO: same back-fill applies — local val and local test cells currently populated for lightweight metrics only.}
-\begin{table*}[t]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{2pt}
-\caption{In-distribution comparison on the public
-testbed (best checkpoint, mean over 3 folds). Top
-half: each client's \textbf{local val} set; bottom
-half: each client's \textbf{local test} set. Bold =
-better of $\{\indiv, \uni\}$ per (institution,
-metric). Column abbreviations are defined in the
-caption of Table~\ref{tab:headline_global}.}
-\label{tab:val_test}
-\begin{tabular}{ll cccc ccccccc}
-\toprule
-\multirow{2}{*}{\textbf{Inst.}} &
-\multirow{2}{*}{\textbf{Method}} &
-\multicolumn{4}{c}{\textbf{Lightweight}} &
-\multicolumn{7}{c}{\textbf{LLM-based / reference-free}} \\
-\cmidrule(lr){3-6} \cmidrule(lr){7-13}
-& &
-\textbf{R-L} & \textbf{B-4} & \textbf{BERT} & \textbf{B\textsubscript{cls}} &
-\textbf{B\textsubscript{LLM}} & \textbf{AnsR} & \textbf{Faith} & \textbf{QAFE} &
-\textbf{RQU} & \textbf{RTC} & \textbf{LLM-J} \\
-\midrule
-\multicolumn{13}{l}{\textit{Local val (per client)}} \\
-\midrule
-\multirow{2}{*}{$\mathcal{I}_0$}
-  & \indiv     & 0.4778 & 0.1951 & 0.8762 & \textbf{0.2088} & --- & --- & --- & --- & --- & --- & --- \\
-  & \UniEdu{}  & \textbf{0.4838} & \textbf{0.2052} & \textbf{0.8799} & 0.1928 & --- & --- & --- & --- & --- & --- & --- \\
-\multirow{2}{*}{$\mathcal{I}_1$}
-  & \indiv     & 0.4851 & 0.1868 & 0.8720 & 0.2369 & --- & --- & --- & --- & --- & --- & --- \\
-  & \UniEdu{}  & \textbf{0.4880} & \textbf{0.2019} & \textbf{0.8810} & \textbf{0.2524} & --- & --- & --- & --- & --- & --- & --- \\
-\multirow{2}{*}{$\mathcal{I}_2$}
-  & \indiv     & 0.4253 & 0.1603 & 0.8589 & 0.1737 & --- & --- & --- & --- & --- & --- & --- \\
-  & \UniEdu{}  & \textbf{0.4405} & \textbf{0.1789} & \textbf{0.8642} & \textbf{0.2088} & --- & --- & --- & --- & --- & --- & --- \\
-\multirow{2}{*}{Mean}
-  & \indiv     & 0.4627 & 0.1807 & 0.8691 & 0.2064 & --- & --- & --- & --- & --- & --- & --- \\
-  & \UniEdu{}  & \textbf{0.4708} & \textbf{0.1953} & \textbf{0.8750} & \textbf{0.2180} & --- & --- & --- & --- & --- & --- & --- \\
-\midrule
-\multicolumn{13}{l}{\textit{Local test (per client)}} \\
-\midrule
-\multirow{2}{*}{$\mathcal{I}_0$}
-  & \indiv     & \textbf{0.4793} & \textbf{0.2019} & \textbf{0.8764} & \textbf{0.2042} & --- & --- & --- & --- & --- & --- & --- \\
-  & \UniEdu{}  & 0.4547 & 0.1679 & 0.8704 & 0.1353 & --- & --- & --- & --- & --- & --- & --- \\
-\multirow{2}{*}{$\mathcal{I}_1$}
-  & \indiv     & \textbf{0.4799} & \textbf{0.1829} & 0.8689 & 0.2173 & --- & --- & --- & --- & --- & --- & --- \\
-  & \UniEdu{}  & 0.4483 & 0.1685 & \textbf{0.8725} & \textbf{0.2576} & --- & --- & --- & --- & --- & --- & --- \\
-\multirow{2}{*}{$\mathcal{I}_2$}
-  & \indiv     & 0.4206 & 0.1565 & 0.8579 & 0.1717 & --- & --- & --- & --- & --- & --- & --- \\
-  & \UniEdu{}  & \textbf{0.4270} & \textbf{0.1612} & \textbf{0.8604} & \textbf{0.1812} & --- & --- & --- & --- & --- & --- & --- \\
-\multirow{2}{*}{Mean}
-  & \indiv     & \textbf{0.4599} & \textbf{0.1804} & 0.8677 & \textbf{0.1977} & --- & --- & --- & --- & --- & --- & --- \\
-  & \UniEdu{}  & 0.4433 & 0.1658 & \textbf{0.8678} & 0.1914 & --- & --- & --- & --- & --- & --- & --- \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -1889,155 +1839,6 @@ Table~\ref{tab:headline_global}.}
 \end{tabular}
 \end{table*}
 
-\red{TODO: Bloom-BERT EVS values for \UniEdu{} can be filled from the blooms\_cls\_evs\_mean key already present in metrics\_*.json (best ckpt, global test). Bloom-LLM EVS and LLM-judge columns require a re-run with the OpenAI key enabled.}
-\begin{table*}[t]
-\centering
-\small
-\caption{Pedagogical and LLM-judge metrics on the
-\textbf{public testbed}. Bloom-EVS is in $[0, 1]$
-(Eq.~\ref{eq:evs}); LLM-judge is the overall mean
-across the four rubric dimensions, also in $[0, 1]$.
-Method rows: \textbf{Indiv} (Section~\ref{sec:baselines}),
-\textbf{FedKD}~\citep{wu2022fedkd},
-\textbf{FedMD}~\citep{li2019fedmd},
-\textbf{FedDF}~\citep{lin2020feddf},
-\textbf{FedET}~\citep{cheng2022fedet}, and
-\UniEdu{}.}
-\label{tab:public_pedagogical}
-\begin{tabular}{llccc}
-\toprule
-\textbf{Institution} & \textbf{Method} &
-\textbf{Bloom-BERT EVS} & \textbf{Bloom-LLM EVS} &
-\textbf{LLM-judge} \\
-\midrule
-\multirow{6}{*}{$\mathcal{I}_0$}
-  & Indiv          & -- & -- & -- \\
-  & FedKD          & -- & -- & -- \\
-  & FedMD          & -- & -- & -- \\
-  & FedDF          & -- & -- & -- \\
-  & FedET          & -- & -- & -- \\
-  & \UniEdu{}      & -- & -- & -- \\
-\midrule
-\multirow{6}{*}{$\mathcal{I}_1$}
-  & Indiv          & -- & -- & -- \\
-  & FedKD          & -- & -- & -- \\
-  & FedMD          & -- & -- & -- \\
-  & FedDF          & -- & -- & -- \\
-  & FedET          & -- & -- & -- \\
-  & \UniEdu{}      & -- & -- & -- \\
-\midrule
-\multirow{6}{*}{$\mathcal{I}_2$}
-  & Indiv          & -- & -- & -- \\
-  & FedKD          & -- & -- & -- \\
-  & FedMD          & -- & -- & -- \\
-  & FedDF          & -- & -- & -- \\
-  & FedET          & -- & -- & -- \\
-  & \UniEdu{}      & -- & -- & -- \\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-\red{TODO: four-dim LLM-judge breakdown not yet populated; needs the same OpenAI-enabled re-run flagged for tab:headline\_global.}
-\begin{table}[t]
-\centering
-\footnotesize
-\caption{LLM-judge per-dimension breakdown for
-\UniEdu{} (public testbed). Strict 1--5 scale.}
-\label{tab:public_llm_judge_dims}
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{lcccc}
-\toprule
-& \textbf{Ctx.} & \textbf{Edu.} & \textbf{Corr.} &
-\textbf{Rel.} \\
-\midrule
-$\mathcal{I}_0$ & -- & -- & -- & -- \\
-$\mathcal{I}_1$ & -- & -- & -- & -- \\
-$\mathcal{I}_2$ & -- & -- & -- & -- \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\red{TODO: UniEdu-static (graph features frozen at round 0) and UniEdu-noFiLM (GAT trained but not fed into the LM) ablations not yet run; one-fold pilot per ablation will go here.}
-\begin{table}[t]
-\centering
-\small
-\caption{Ablation on the public testbed:
-\UniEdu{}-static freezes the architecture-graph
-features at round~0; \UniEdu{}-noFiLM trains the GAT
-but does not feed its embeddings into the LM. Drop
-relative to full \UniEdu{} on LLM-judge overall.}
-\label{tab:public_ablation}
-\begin{tabular}{lccc}
-\toprule
-& $\mathcal{I}_0$ & $\mathcal{I}_1$ & $\mathcal{I}_2$ \\
-\midrule
-\UniEdu{} (full)    & -- & -- & -- \\
-\UniEdu{}-static    & -- & -- & -- \\
-\UniEdu{}-noFiLM    & -- & -- & -- \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Per-Institution Uplift and Knowledge Transfer}
-\label{sec:results_kti}
-
-\red{TODO: private-testbed uplift; awaits private Phase~2 outputs.}
-\begin{table}[t]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\caption{Per-institution uplift $\Delta = Q^{(\uni)}
-- Q^{(\indiv)}$ on the private testbed. Positive =
-the institution's SLM benefits from federation.}
-\label{tab:uplift}
-\begin{tabular}{lcccc}
-\toprule
-\textbf{Inst.} & $\Delta\,$\textbf{R-L} &
-$\Delta\,$\textbf{LLM-J} & $\Delta\,$\textbf{Bloom} &
-$\Delta\,\bar{E}$ \\
-\midrule
-$\mathcal{I}_0$ (BART)        & -- & -- & -- & -- \\
-$\mathcal{I}_1$ (Flan-T5)     & -- & -- & -- & -- \\
-$\mathcal{I}_2$ (LED)         & -- & -- & -- & -- \\
-$\mathcal{I}_3$ (Pegasus-X)   & -- & -- & -- & -- \\
-$\mathcal{I}_4$ (ProphetNet)  & -- & -- & -- & -- \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\red{TODO: KTI requires per-direction held-out eval on $T_{k\setminus l}$ chunks; eval pool not yet curated.}
-\begin{table}[t]
-\centering
-\small
-\caption{Knowledge Transfer Index $\mathrm{KTI}(l
-\leftarrow k)$ measured on
-$\mathcal{T}_{k\setminus l}$ (held-out chunks
-covering topics exclusive to institution $k$'s
-curriculum). \UniEdu{} cells should be
-\emph{positive}; \UniEdu{}-noFiLM cells should be
-near zero (control).}
-\label{tab:kti}
-\begin{tabular}{llccc}
-\toprule
-\textbf{Direction $(l \leftarrow k)$} & \textbf{Method} &
-$Q_l^{\indiv}$ & $Q_l^{\uni}$ &
-$\mathrm{KTI}$ \\
-\midrule
-$\mathcal{I}_0 \leftarrow \mathcal{I}_2$
-  & \UniEdu{}  & -- & -- & -- \\
-  & noFiLM     & -- & -- & -- \\
-\midrule
-$\mathcal{I}_1 \leftarrow \mathcal{I}_2$
-  & \UniEdu{}  & -- & -- & -- \\
-  & noFiLM     & -- & -- & -- \\
-\midrule
-$\mathcal{I}_2 \leftarrow \mathcal{I}_0$
-  & \UniEdu{}  & -- & -- & -- \\
-  & noFiLM     & -- & -- & -- \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 \subsection{Statistical Validation}
 \label{sec:results_stats}
 
@@ -2092,25 +1893,28 @@ reproduced in Appendix~\ref{app:llm_judge_prompt}.
 \red{TODO: single-LLM zero-shot panel (GPT-4o, GPT-4o-mini, Llama-3.1-8B-Inst, Qwen-2.5-7B-Inst, Mistral-7B-Inst, Gemini-1.5-Flash) not yet collected; UniEdu federated-mixture row also pending the OpenAI-enabled re-run.}
 \begin{table*}[t]
 \centering
-\small
+\footnotesize
+\setlength{\tabcolsep}{3pt}
 \caption{H2 (LLM approximation): the \UniEdu{}
 federated mixture compared against zero-shot
 single-LLM baselines on the public-testbed val set
 (mean over 3 folds). The federated mixture row is
 \UniEdu{} averaged across the institutions in the
-public testbed. Bold = best per metric.}
+public testbed. Column abbreviations match
+Table~\ref{tab:headline_global}; B-EVS is the
+local Bloom's classifier under EVS. Bold = best per metric.}
 \label{tab:llm_approx}
 \begin{tabular}{lccccccccc}
 \toprule
 \textbf{Method} &
-\textbf{ROUGE-L} & \textbf{BLEU-4} & \textbf{BERT-F1} &
-\textbf{RTC} & \textbf{Faith.} & \textbf{QAFactEval} &
-\textbf{RQUGE} & \textbf{Bloom-EVS} & \textbf{LLM-J} \\
+\textbf{R-L} & \textbf{B-4} & \textbf{BERT} &
+\textbf{RTC} & \textbf{Faith} & \textbf{QAFE} &
+\textbf{RQU} & \textbf{B-EVS} & \textbf{LLM-J} \\
 \midrule
-\UniEdu{} (federated mixture) & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+\UniEdu{} (fed.\ mixture) & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 \midrule
-GPT-4o          & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-GPT-4o-mini     & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+GPT-4o              & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+GPT-4o-mini         & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 Llama-3.1-8B-Inst   & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 Qwen-2.5-7B-Inst    & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 Mistral-7B-Inst     & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
@@ -2921,6 +2725,229 @@ metric).}
 \bottomrule
 \end{tabular}
 \end{table*}
+
+%% ════════════════════════════════════════════════════════════
+\section{Supplementary Results Tables}
+\label{app:supp_results}
+
+This appendix collects the supplementary result
+tables referenced from
+Section~\ref{sec:results_equity}: in-distribution
+local val/test breakdown
+(Table~\ref{tab:val_test}), pedagogical and
+LLM-judge metrics on the public testbed
+(Tables~\ref{tab:public_pedagogical}--\ref{tab:public_llm_judge_dims}),
+the \UniEdu{}-static and \UniEdu{}-noFiLM
+conditioning ablations
+(Table~\ref{tab:public_ablation}), per-institution
+uplift on the private testbed
+(Table~\ref{tab:uplift}), and the
+direction-resolved Knowledge Transfer Index
+(Table~\ref{tab:kti}).
+
+\red{TODO: same back-fill applies — local val and local test cells currently populated for lightweight metrics only.}
+\begin{table*}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\caption{In-distribution comparison on the public
+testbed (best checkpoint, mean over 3 folds). Top
+half: each client's \textbf{local val} set; bottom
+half: each client's \textbf{local test} set. Bold =
+better of $\{\indiv, \uni\}$ per (institution,
+metric). Column abbreviations are defined in the
+caption of Table~\ref{tab:headline_global}.}
+\label{tab:val_test}
+\begin{tabular}{ll cccc ccccccc}
+\toprule
+\multirow{2}{*}{\textbf{Inst.}} &
+\multirow{2}{*}{\textbf{Method}} &
+\multicolumn{4}{c}{\textbf{Lightweight}} &
+\multicolumn{7}{c}{\textbf{LLM-based / reference-free}} \\
+\cmidrule(lr){3-6} \cmidrule(lr){7-13}
+& &
+\textbf{R-L} & \textbf{B-4} & \textbf{BERT} & \textbf{B\textsubscript{cls}} &
+\textbf{B\textsubscript{LLM}} & \textbf{AnsR} & \textbf{Faith} & \textbf{QAFE} &
+\textbf{RQU} & \textbf{RTC} & \textbf{LLM-J} \\
+\midrule
+\multicolumn{13}{l}{\textit{Local val (per client)}} \\
+\midrule
+\multirow{2}{*}{$\mathcal{I}_0$}
+  & \indiv     & 0.4778 & 0.1951 & 0.8762 & \textbf{0.2088} & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4838} & \textbf{0.2052} & \textbf{0.8799} & 0.1928 & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_1$}
+  & \indiv     & 0.4851 & 0.1868 & 0.8720 & 0.2369 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4880} & \textbf{0.2019} & \textbf{0.8810} & \textbf{0.2524} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_2$}
+  & \indiv     & 0.4253 & 0.1603 & 0.8589 & 0.1737 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4405} & \textbf{0.1789} & \textbf{0.8642} & \textbf{0.2088} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{Mean}
+  & \indiv     & 0.4627 & 0.1807 & 0.8691 & 0.2064 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4708} & \textbf{0.1953} & \textbf{0.8750} & \textbf{0.2180} & --- & --- & --- & --- & --- & --- & --- \\
+\midrule
+\multicolumn{13}{l}{\textit{Local test (per client)}} \\
+\midrule
+\multirow{2}{*}{$\mathcal{I}_0$}
+  & \indiv     & \textbf{0.4793} & \textbf{0.2019} & \textbf{0.8764} & \textbf{0.2042} & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4547 & 0.1679 & 0.8704 & 0.1353 & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_1$}
+  & \indiv     & \textbf{0.4799} & \textbf{0.1829} & 0.8689 & 0.2173 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4483 & 0.1685 & \textbf{0.8725} & \textbf{0.2576} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{$\mathcal{I}_2$}
+  & \indiv     & 0.4206 & 0.1565 & 0.8579 & 0.1717 & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & \textbf{0.4270} & \textbf{0.1612} & \textbf{0.8604} & \textbf{0.1812} & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{2}{*}{Mean}
+  & \indiv     & \textbf{0.4599} & \textbf{0.1804} & 0.8677 & \textbf{0.1977} & --- & --- & --- & --- & --- & --- & --- \\
+  & \UniEdu{}  & 0.4433 & 0.1658 & \textbf{0.8678} & 0.1914 & --- & --- & --- & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\red{TODO: Bloom-BERT EVS values for \UniEdu{} can be filled from the blooms\_cls\_evs\_mean key already present in metrics\_*.json (best ckpt, global test). Bloom-LLM EVS and LLM-judge columns require a re-run with the OpenAI key enabled.}
+\begin{table*}[t]
+\centering
+\small
+\caption{Pedagogical and LLM-judge metrics on the
+\textbf{public testbed}. Bloom-EVS is in $[0, 1]$
+(Eq.~\ref{eq:evs}); LLM-judge is the overall mean
+across the four rubric dimensions, also in $[0, 1]$.
+Method rows: \textbf{Indiv} (Section~\ref{sec:baselines}),
+\textbf{FedKD}~\citep{wu2022fedkd},
+\textbf{FedMD}~\citep{li2019fedmd},
+\textbf{FedDF}~\citep{lin2020feddf},
+\textbf{FedET}~\citep{cheng2022fedet}, and
+\UniEdu{}.}
+\label{tab:public_pedagogical}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Institution} & \textbf{Method} &
+\textbf{Bloom-BERT EVS} & \textbf{Bloom-LLM EVS} &
+\textbf{LLM-judge} \\
+\midrule
+\multirow{6}{*}{$\mathcal{I}_0$}
+  & Indiv          & -- & -- & -- \\
+  & FedKD          & -- & -- & -- \\
+  & FedMD          & -- & -- & -- \\
+  & FedDF          & -- & -- & -- \\
+  & FedET          & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- \\
+\midrule
+\multirow{6}{*}{$\mathcal{I}_1$}
+  & Indiv          & -- & -- & -- \\
+  & FedKD          & -- & -- & -- \\
+  & FedMD          & -- & -- & -- \\
+  & FedDF          & -- & -- & -- \\
+  & FedET          & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- \\
+\midrule
+\multirow{6}{*}{$\mathcal{I}_2$}
+  & Indiv          & -- & -- & -- \\
+  & FedKD          & -- & -- & -- \\
+  & FedMD          & -- & -- & -- \\
+  & FedDF          & -- & -- & -- \\
+  & FedET          & -- & -- & -- \\
+  & \UniEdu{}      & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\red{TODO: four-dim LLM-judge breakdown not yet populated; needs the same OpenAI-enabled re-run flagged for tab:headline\_global.}
+\begin{table}[t]
+\centering
+\footnotesize
+\caption{LLM-judge per-dimension breakdown for
+\UniEdu{} (public testbed). Strict 1--5 scale.}
+\label{tab:public_llm_judge_dims}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccc}
+\toprule
+& \textbf{Ctx.} & \textbf{Edu.} & \textbf{Corr.} &
+\textbf{Rel.} \\
+\midrule
+$\mathcal{I}_0$ & -- & -- & -- & -- \\
+$\mathcal{I}_1$ & -- & -- & -- & -- \\
+$\mathcal{I}_2$ & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\red{TODO: UniEdu-static (graph features frozen at round 0) and UniEdu-noFiLM (GAT trained but not fed into the LM) ablations not yet run; one-fold pilot per ablation will go here.}
+\begin{table}[t]
+\centering
+\small
+\caption{Ablation on the public testbed:
+\UniEdu{}-static freezes the architecture-graph
+features at round~0; \UniEdu{}-noFiLM trains the GAT
+but does not feed its embeddings into the LM. Drop
+relative to full \UniEdu{} on LLM-judge overall.}
+\label{tab:public_ablation}
+\begin{tabular}{lccc}
+\toprule
+& $\mathcal{I}_0$ & $\mathcal{I}_1$ & $\mathcal{I}_2$ \\
+\midrule
+\UniEdu{} (full)    & -- & -- & -- \\
+\UniEdu{}-static    & -- & -- & -- \\
+\UniEdu{}-noFiLM    & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\red{TODO: private-testbed uplift; awaits private Phase~2 outputs.}
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Per-institution uplift $\Delta = Q^{(\uni)}
+- Q^{(\indiv)}$ on the private testbed. Positive =
+the institution's SLM benefits from federation.}
+\label{tab:uplift}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Inst.} & $\Delta\,$\textbf{R-L} &
+$\Delta\,$\textbf{LLM-J} & $\Delta\,$\textbf{Bloom} &
+$\Delta\,\bar{E}$ \\
+\midrule
+$\mathcal{I}_0$ (BART)        & -- & -- & -- & -- \\
+$\mathcal{I}_1$ (Flan-T5)     & -- & -- & -- & -- \\
+$\mathcal{I}_2$ (LED)         & -- & -- & -- & -- \\
+$\mathcal{I}_3$ (Pegasus-X)   & -- & -- & -- & -- \\
+$\mathcal{I}_4$ (ProphetNet)  & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\red{TODO: KTI requires per-direction held-out eval on $T_{k\setminus l}$ chunks; eval pool not yet curated.}
+\begin{table}[t]
+\centering
+\small
+\caption{Knowledge Transfer Index $\mathrm{KTI}(l
+\leftarrow k)$ measured on
+$\mathcal{T}_{k\setminus l}$ (held-out chunks
+covering topics exclusive to institution $k$'s
+curriculum). \UniEdu{} cells should be
+\emph{positive}; \UniEdu{}-noFiLM cells should be
+near zero (control).}
+\label{tab:kti}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Direction $(l \leftarrow k)$} & \textbf{Method} &
+$Q_l^{\indiv}$ & $Q_l^{\uni}$ &
+$\mathrm{KTI}$ \\
+\midrule
+$\mathcal{I}_0 \leftarrow \mathcal{I}_2$
+  & \UniEdu{}  & -- & -- & -- \\
+  & noFiLM     & -- & -- & -- \\
+\midrule
+$\mathcal{I}_1 \leftarrow \mathcal{I}_2$
+  & \UniEdu{}  & -- & -- & -- \\
+  & noFiLM     & -- & -- & -- \\
+\midrule
+$\mathcal{I}_2 \leftarrow \mathcal{I}_0$
+  & \UniEdu{}  & -- & -- & -- \\
+  & noFiLM     & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \end{document}
 
